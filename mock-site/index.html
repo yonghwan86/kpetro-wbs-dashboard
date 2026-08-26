@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="pageTitle">프로젝트 구축 현황</title>
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" href="/assets/kpetro-app-icon.png" type="image/png" sizes="512x512">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <script src="/assets/mock-api.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { width: 100%; height: 100vh; overflow: hidden; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background-color: #121212; color: #e0e0e0; }
+        body { display: flex; flex-direction: column; padding: 1.5vh 1.5vw; gap: 1.2vh; }
+
+        .d-day-section { flex: 0 0 auto; background-color: #000000; padding: 2vh 20px; border-radius: 12px; display: grid; grid-template-columns: minmax(285px, 0.8fr) minmax(520px, 2fr) minmax(285px, 0.8fr); align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.8); border: 1px solid #222; position: relative; }
+        .brand-area { display: flex; justify-content: flex-start; align-items: center; min-width: 0; padding-left: 10px; }
+        .brand-lockup { width: 275px; height: 78px; display: flex; align-items: center; justify-content: flex-start; }
+        .brand-logo { display: block; width: 100%; height: 100%; object-fit: contain; object-position: left center; image-rendering: auto; }
+        .header-balance { min-width: 0; }
+
+        .d-day-center { text-align: center; min-width: 0; }
+        .d-day-title { color: #cccccc; font-size: 24px; font-size: clamp(18px, 2vw, 28px); font-weight: 400; margin-bottom: 1vh; letter-spacing: 3px; }
+        .d-day-timer { display: flex; justify-content: center; align-items: flex-start; gap: 1.5vw; }
+        .time-box { display: flex; flex-direction: column; align-items: center; width: auto; min-width: 60px; }
+        .time-value { color: #ffffff; font-size: 48px; font-size: clamp(30px, 4vw, 65px); font-weight: bold; font-family: 'Arial', sans-serif; text-shadow: 0px 0px 15px rgba(255, 255, 255, 0.9); line-height: 1; }
+        .time-label { color: #999999; font-size: 14px; font-size: clamp(12px, 1.2vw, 18px); margin-top: 0.5vh; font-weight: bold; }
+        .time-colon { color: #444444; font-size: 38px; font-size: clamp(20px, 3.5vw, 50px); font-weight: bold; margin-top: -3px; line-height: 1.2; }
+
+        .top-section { flex: 0 1 28%; min-height: 0; display: flex; gap: 1.5vw; }
+        .sys-chart-wrapper { flex: 1; border: 1px solid #333; padding: 1vh; background: #1a1a1a; border-radius: 8px; min-height: 200px; position: relative; }
+        .chart-wrapper { flex: 1.5; border: 1px solid #333; padding: 1vh; background: #1a1a1a; border-radius: 8px; min-height: 200px; position: relative; }
+        .sys-chart-wrapper canvas, .chart-wrapper canvas { width: 100% !important; height: 100% !important; }
+
+        .table-wrapper { flex: 1 1 auto; min-height: 0; background: #1a1a1a; border-radius: 8px; padding: 1.5vh; border: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 12px; font-size: clamp(11px, 0.9vw, 13px); color: #ccc; table-layout: fixed; }
+        th, td { border: 1px solid #444; padding: 0.4vh 0.4vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .table-header-box { flex: 0 0 auto; width: 100%; background-color: #262626; overflow: hidden; }
+        .table-header-box th { font-weight: bold; color: #ddd; }
+        .table-body-box { flex: 1 1 auto; width: 100%; overflow-y: auto; overflow-x: auto; min-height: 0; }
+        .table-body-box td { background-color: #1a1a1a; }
+
+        .month-header { background-color: #383018 !important; color: #e6c86e !important; }
+        .week-header { background-color: #1f2a38 !important; color: #8faecf !important; }
+        .gate-header { background-color: #990000 !important; color: #ffffff !important; font-weight: bold; }
+
+        .timeline-cell { border: 1px dashed #555; }
+        .gantt-fill { background-color: #ca8a04 !important; }
+        .current-week-line { border-left: 2px solid #5b9bd5 !important; border-right: 2px solid #5b9bd5 !important; }
+        th.current-week-line { background-color: #4a6fa5 !important; color: #ffffff !important; border: 1px solid #5b9bd5 !important; text-shadow: 0 0 5px rgba(255,255,255,0.8); }
+
+        .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; border: 1px solid #111; }
+        .dot-green { background-color: #70a33a; }
+        .dot-yellow { background-color: #cc9900; }
+        .dot-red { background-color: #cc0000; }
+
+        .bottom-nav { flex: 0 0 auto; display: flex; justify-content: center; gap: 15px; padding-top: 5px; }
+        .nav-btn { background-color: #2b4f73; color: #fff; border: 1px solid #5b9bd5; padding: 8px 20px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; text-decoration: none; transition: background 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .nav-btn:hover { background-color: #3b6fa5; }
+
+        @media screen and (max-width: 1400px) {
+            .d-day-section { grid-template-columns: minmax(225px, 0.75fr) minmax(500px, 2fr) minmax(225px, 0.75fr); }
+            .brand-lockup { width: 220px; height: 63px; }
+        }
+
+        @media screen and (max-width: 1050px) {
+            .d-day-section { grid-template-columns: 180px minmax(470px, 1fr) 36px; padding-left: 14px; padding-right: 14px; }
+            .brand-area { padding-left: 4px; }
+            .brand-lockup { width: 175px; height: 50px; }
+            .d-day-title { letter-spacing: 1px; }
+        }
+
+        /* --- A4 한 페이지 인쇄 최적화 스타일 --- */
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 5mm;
+            }
+            html, body {
+                width: 100% !important;
+                height: 100% !important;
+                overflow: hidden !important;
+                background-color: #121212 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                zoom: 88%;
+            }
+            body {
+                padding: 0 !important;
+                gap: 5px !important;
+            }
+            .bottom-nav {
+                display: none !important;
+            }
+            .table-wrapper {
+                max-height: none !important;
+                overflow: visible !important;
+            }
+            .table-body-box {
+                max-height: none !important;
+                overflow: visible !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="d-day-section">
+        <div class="brand-area">
+            <div class="brand-lockup">
+                <img src="/assets/kpetro-ci.png" alt="KPetro 코퍼레이트 심볼" class="brand-logo" onerror="this.parentElement.style.display='none'">
+            </div>
+        </div>
+        <div class="d-day-center">
+            <div class="d-day-title" id="dDayTitle">프로젝트 구축 D-DAY</div>
+            <div class="d-day-timer">
+                <div class="time-box"><div class="time-value" id="days">00</div><div class="time-label">일</div></div>
+                <div class="time-colon">:</div>
+                <div class="time-box"><div class="time-value" id="hours">00</div><div class="time-label">시</div></div>
+                <div class="time-colon">:</div>
+                <div class="time-box"><div class="time-value" id="minutes">00</div><div class="time-label">분</div></div>
+                <div class="time-colon">:</div>
+                <div class="time-box"><div class="time-value" id="seconds">00</div><div class="time-label">초</div></div>
+            </div>
+        </div>
+        <div class="header-balance" aria-hidden="true"></div>
+    </div>
+
+    <div class="top-section">
+        <div class="sys-chart-wrapper"><canvas id="sysComparisonChart"></canvas></div>
+        <div class="chart-wrapper"><canvas id="progressChart"></canvas></div>
+    </div>
+
+    <div class="table-wrapper">
+        <div class="table-header-box" id="headerBox">
+            <table id="headerTable">
+                <colgroup id="sharedColGroup"></colgroup>
+                <thead>
+                    <tr>
+                        <th rowspan="2">시스템명</th>
+                        <th rowspan="2">단계</th>
+                        <th rowspan="2">계획진척율</th>
+                        <th rowspan="2">실제진척율</th>
+                        <th rowspan="2">
+                            차이<br>
+                            <div style="display: inline-flex; gap: 3px; margin-top: 3px;" class="no-print">
+                                <button id="btnAll" onclick="setFilter('all')" style="font-size:10px; padding:1px 5px; background:#2b4f73; color:#fff; border:1px solid #5b9bd5; border-radius:3px; cursor:pointer; font-weight:bold;">전체</button>
+                                <button id="btnDelayed" onclick="setFilter('delayed')" style="font-size:10px; padding:1px 5px; background:#444; color:#aaa; border:1px solid #555; border-radius:3px; cursor:pointer; font-weight:bold;">지연</button>
+                            </div>
+                        </th>
+                        <th colspan="4" class="month-header">8월</th>
+                        <th colspan="5" class="month-header">9월</th>
+                        <th colspan="4" class="month-header">10월</th>
+                        <th colspan="4" class="month-header">11월</th>
+                        <th colspan="4" class="month-header">12월</th>
+                    </tr>
+                    <tr id="headerWeekRow"></tr>
+                </thead>
+            </table>
+        </div>
+        <div class="table-body-box" id="bodyBox">
+            <table id="bodyTable">
+                <colgroup id="bodyColGroup"></colgroup>
+                <tbody id="wbsTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <a href="/input.html" class="nav-btn">진척관리(단계별)</a>
+        <a href="/weekly-input.html" class="nav-btn">진척관리(주차별)</a>
+        <a href="/meetings.html" class="nav-btn" style="background-color: #3b5998;">회의 관리</a>
+        <a href="/project-config.html" class="nav-btn" style="background-color: #4a3380;">프로젝트 관리</a>
+        <button class="nav-btn" onclick="window.print()">출력</button>
+    </div>
+
+    <script>
+        let currentFilter = 'all';
+
+        // 맨 앞의 숫자와 점(예: "1. ", "2. ")을 숨기기 위한 헬퍼 함수
+        function cleanDisplayLabel(text) {
+            if (!text) return '';
+            return text.replace(/^\d+[\.\s\-]+\s*/, '');
+        }
+
+        function setFilter(mode) {
+            currentFilter = mode;
+            if (mode === 'all') {
+                document.getElementById('btnAll').style.background = '#2b4f73';
+                document.getElementById('btnAll').style.color = '#fff';
+                document.getElementById('btnAll').style.borderColor = '#5b9bd5';
+                document.getElementById('btnDelayed').style.background = '#444';
+                document.getElementById('btnDelayed').style.color = '#aaa';
+                document.getElementById('btnDelayed').style.borderColor = '#555';
+            } else {
+                document.getElementById('btnDelayed').style.background = '#990000';
+                document.getElementById('btnDelayed').style.color = '#fff';
+                document.getElementById('btnDelayed').style.borderColor = '#ff4d4d';
+                document.getElementById('btnAll').style.background = '#444';
+                document.getElementById('btnAll').style.color = '#aaa';
+                document.getElementById('btnAll').style.borderColor = '#555';
+            }
+            window.updateDashboard();
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            Chart.register(ChartDataLabels);
+
+            const projectStartDate = new Date('2026-08-03');
+            const weekMapping = [
+                { globalW: 1, monthW: 1 }, { globalW: 2, monthW: 2 }, { globalW: 3, monthW: 3 }, { globalW: 4, monthW: 4 },
+                { globalW: 5, monthW: 1 }, { globalW: 6, monthW: 2 }, { globalW: 7, monthW: 3 }, { globalW: 8, monthW: 4 }, { globalW: 9, monthW: 5 },
+                { globalW: 10, monthW: 1 }, { globalW: 11, monthW: 2 }, { globalW: 12, monthW: 3 }, { globalW: 13, monthW: 4 },
+                { globalW: 14, monthW: 1 }, { globalW: 15, monthW: 2 }, { globalW: 16, monthW: 3 }, { globalW: 17, monthW: 4 },
+                { globalW: 18, monthW: 1 }, { globalW: 19, monthW: 2 }, { globalW: 20, monthW: 3 }, { globalW: 21, monthW: 4 }
+            ];
+            const currentGlobalWeek = Math.max(1, Math.min(21, Math.floor((new Date() - projectStartDate) / (1000 * 60 * 60 * 24 * 7)) + 1));
+
+            function buildColGroups() {
+                const widths = ['15%', '16%', '7%', '7%', '7%'];
+                for (let i = 0; i < 21; i++) { widths.push('1.8vw'); }
+                const makeCols = (groupId) => {
+                    const cg = document.getElementById(groupId);
+                    cg.innerHTML = '';
+                    widths.forEach(w => {
+                        let col = document.createElement('col');
+                        col.style.width = w;
+                        cg.appendChild(col);
+                    });
+                };
+                makeCols('sharedColGroup');
+                makeCols('bodyColGroup');
+            }
+            buildColGroups();
+
+            const headerWeekRow = document.getElementById('headerWeekRow');
+            weekMapping.forEach(item => {
+                let th = document.createElement('th');
+                if (item.globalW === 14) {
+                    th.className = 'timeline-cell gate-header';
+                    th.textContent = item.monthW;
+                } else {
+                    let cls = 'week-header timeline-cell';
+                    if (item.globalW === currentGlobalWeek) cls += ' current-week-line';
+                    th.className = cls;
+                    th.textContent = item.monthW;
+                }
+                headerWeekRow.appendChild(th);
+            });
+
+            const bodyBox = document.getElementById('bodyBox');
+            const headerBox = document.getElementById('headerBox');
+
+            function syncScrollbarWidth() {
+                const scrollbarWidth = bodyBox.offsetWidth - bodyBox.clientWidth;
+                headerBox.style.paddingRight = scrollbarWidth > 0 ? scrollbarWidth + 'px' : '0px';
+            }
+            window.addEventListener('load', syncScrollbarWidth);
+            window.addEventListener('resize', syncScrollbarWidth);
+            bodyBox.addEventListener('scroll', () => { headerBox.scrollLeft = bodyBox.scrollLeft; });
+
+            function getDateWeek(dateStr) {
+                if (!dateStr) return 0;
+                const d = new Date(dateStr);
+                const diffDays = Math.floor((d - projectStartDate) / (1000 * 60 * 60 * 24));
+                return Math.max(1, Math.min(21, Math.floor(diffDays / 7) + 1));
+            }
+
+            let targetTimestamp = new Date('2026-11-01T00:00:00').getTime();
+            async function initProjectConfig() {
+                try {
+                    const res = await fetch('/api/config');
+                    const config = await res.json();
+                    if (config.project_title) {
+                        document.getElementById('dDayTitle').innerText = config.project_title + ' D-DAY';
+                        document.getElementById('pageTitle').innerText = config.project_title + ' 현황';
+                    }
+                    if (config.target_date) {
+                        targetTimestamp = new Date(config.target_date + 'T00:00:00').getTime();
+                    }
+                } catch(e) { console.error(e); }
+            }
+
+            function updateTimer() {
+                const now = new Date().getTime();
+                const distance = targetTimestamp - now;
+                if (distance > 0) {
+                    document.getElementById("days").innerText = String(Math.floor(distance / (1000 * 60 * 60 * 24))).padStart(2, '0');
+                    document.getElementById("hours").innerText = String(Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))).padStart(2, '0');
+                    document.getElementById("minutes").innerText = String(Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
+                    document.getElementById("seconds").innerText = String(Math.floor((distance % (1000 * 60)) / 1000)).padStart(2, '0');
+                }
+            }
+            setInterval(updateTimer, 1000);
+
+            const dataLabelConfig = {
+                color: '#fff', anchor: 'end', align: 'top',
+                font: { weight: 'bold', size: 11 },
+                formatter: v => Math.round(v) + '%'
+            };
+
+            const sysChartCtx = document.getElementById('sysComparisonChart').getContext('2d');
+            const sysComparisonChart = new Chart(sysChartCtx, {
+                type: 'bar',
+                data: { labels: [], datasets: [
+                    { label: '계획', data: [], backgroundColor: '#5b9bd5', datalabels: dataLabelConfig },
+                    { label: '실적', data: [], backgroundColor: '#ed7d31', datalabels: dataLabelConfig }
+                ]},
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    layout: { padding: { top: 20 } },
+                    scales: {
+                        y: { min: 0, max: 100, ticks: { color: '#ccc', callback: v => v + '%' }, grid: { color: '#333' } },
+                        x: {
+                            ticks: {
+                                color: '#ccc',
+                                callback: function(val, index) {
+                                    // 그래프 하단 축 라벨에서도 번호 제거
+                                    return cleanDisplayLabel(this.getLabelForValue(val));
+                                }
+                            },
+                            grid: { color: '#333' }
+                        }
+                    },
+                    plugins: { legend: { labels: { color: '#fff', boxWidth: 12 } } }
+                }
+            });
+
+            const chartCtx = document.getElementById('progressChart').getContext('2d');
+            const progressChart = new Chart(chartCtx, {
+                type: 'line',
+                data: { labels: [], datasets: [
+                    {
+                        label: '계획', data: [], borderColor: '#5b9bd5', tension: 0.1,
+                        pointRadius: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? 7 : 3,
+                        pointBackgroundColor: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? '#ffffff' : '#5b9bd5',
+                        pointBorderColor: '#5b9bd5', pointBorderWidth: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? 3 : 1,
+                        datalabels: { color: '#5b9bd5', align: 'top', font: { size: 10, weight: 'bold' }, formatter: v => (v ? v + '%' : '') }
+                    },
+                    {
+                        label: '실적', data: [], borderColor: '#ed7d31', tension: 0.1,
+                        pointRadius: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? 7 : 3,
+                        pointBackgroundColor: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? '#ffffff' : '#ed7d31',
+                        pointBorderColor: '#ed7d31', pointBorderWidth: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? 3 : 1,
+                        datalabels: { color: '#ed7d31', align: 'bottom', font: { size: 10, weight: 'bold' }, formatter: v => (v ? v + '%' : '') }
+                    }
+                ]},
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    layout: { padding: { top: 15, bottom: 15 } },
+                    scales: {
+                        y: { min: 0, max: 100, ticks: { color: '#ccc', callback: v => v + '%' }, grid: { color: '#333' } },
+                        x: { ticks: { color: '#ccc' }, grid: { color: '#333' } }
+                    },
+                    plugins: { legend: { labels: { color: '#fff', boxWidth: 12 } } }
+                }
+            });
+
+            window.updateDashboard = async function() {
+                try {
+                    const [resWeekly, resWbs] = await Promise.all([
+                        fetch('/api/weekly'),
+                        fetch('/api/wbs')
+                    ]);
+                    const weekly = await resWeekly.json();
+                    const state = await resWbs.json();
+
+                    if (weekly && weekly.labels) {
+                        progressChart.data.labels = weekly.labels;
+                        progressChart.data.datasets[0].data = weekly.plan;
+                        progressChart.data.datasets[1].data = weekly.actual;
+                        progressChart.update();
+                    }
+
+                    if (!state) return;
+
+                    const systemsMap = {};
+                    for (const key in state) {
+                        const idx = key.indexOf('_');
+                        if (idx === -1) continue;
+                        const sys = key.substring(0, idx);
+                        const phase = key.substring(idx + 1);
+                        if (!systemsMap[sys]) systemsMap[sys] = [];
+                        systemsMap[sys].push(Object.assign({ phase: phase }, state[key]));
+                    }
+
+                    const tbody = document.getElementById('wbsTableBody');
+                    tbody.innerHTML = '';
+                    let chartLabels = [], chartPlan = [], chartActual = [];
+
+                    for (const sys in systemsMap) {
+                        const allPhases = systemsMap[sys];
+
+                        const phases = allPhases.filter(item => {
+                            const p = parseFloat(item.plan) || 0;
+                            const a = parseFloat(item.actual) || 0;
+                            const diff = a - p;
+                            if (currentFilter === 'delayed') {
+                                return diff < 0;
+                            }
+                            return true;
+                        });
+
+                        let sysPlanSum = 0, sysActualSum = 0;
+                        allPhases.forEach(item => {
+                            const w = parseFloat(item.weight) || 0;
+                            const p = parseFloat(item.plan) || 0;
+                            const a = parseFloat(item.actual) || 0;
+                            sysPlanSum += (p * w) / 100;
+                            sysActualSum += (a * w) / 100;
+                        });
+
+                        chartLabels.push(sys); // 정렬 및 매핑용 원본 이름 유지
+                        chartPlan.push(Math.round(sysPlanSum));
+                        chartActual.push(Math.round(sysActualSum));
+
+                        if (phases.length === 0) continue;
+
+                        phases.forEach((item, index) => {
+                            const p = parseFloat(item.plan) || 0;
+                            const a = parseFloat(item.actual) || 0;
+                            const diff = (a - p).toFixed(1);
+                            let dotClass = 'dot-green';
+                            if (diff < 0) dotClass = diff <= -1.0 ? 'dot-red' : 'dot-yellow';
+
+                            const startWeek = getDateWeek(item.start_date);
+                            const endWeek = getDateWeek(item.end_date);
+
+                            let tr = document.createElement('tr');
+                            if (index === 0) {
+                                // 화면 표시 시 번호 제거된 이름(cleanDisplayLabel) 사용
+                                tr.innerHTML += `<td rowspan="${phases.length}" style="font-weight:bold; color: #fff; background-color: #1a1a1a;">${cleanDisplayLabel(sys)}</td>`;
+                            }
+                            tr.innerHTML += `
+                                <td style="background-color: #1a1a1a;">${cleanDisplayLabel(item.phase)}</td>
+                                <td style="background-color: #1a1a1a;">${p}%</td>
+                                <td style="background-color: #1a1a1a;">${a}%</td>
+                                <td style="background-color: #1a1a1a;"><span class="dot ${dotClass}"></span> ${diff > 0 ? '+' + diff : diff}%</td>
+                            `;
+
+                            weekMapping.forEach(wItem => {
+                                let classes = ['timeline-cell'];
+                                if (item.start_date && item.end_date && wItem.globalW >= startWeek && wItem.globalW <= endWeek) {
+                                    classes.push('gantt-fill');
+                                }
+                                if (wItem.globalW === currentGlobalWeek) classes.push('current-week-line');
+                                tr.innerHTML += `<td class="${classes.join(' ')}" style="background-color: #1a1a1a;"></td>`;
+                            });
+                            tbody.appendChild(tr);
+                        });
+                    }
+
+                    sysComparisonChart.data.labels = chartLabels;
+                    sysComparisonChart.data.datasets[0].data = chartPlan;
+                    sysComparisonChart.data.datasets[1].data = chartActual;
+                    sysComparisonChart.update();
+
+                    syncScrollbarWidth();
+                } catch(e) { console.error(e); }
+            }
+
+            initProjectConfig().then(() => {
+                updateTimer();
+                updateDashboard();
+            });
+            setInterval(updateDashboard, 60 * 60 * 1000);
+        });
+    </script>
+</body>
+</html>

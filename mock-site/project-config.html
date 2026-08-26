@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프로젝트 설정</title>
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" href="/assets/kpetro-app-icon.png" type="image/png" sizes="512x512">
+    <script src="/assets/mock-api.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background-color: #121212; color: #e0e0e0; padding: 20px; }
+        .container { max-width: 800px; margin: 20px auto; background: #1a1a1a; padding: 25px; border-radius: 10px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.8); }
+
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        h1 { font-size: 22px; color: #ffffff; }
+
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; transition: background 0.2s; }
+        .btn-success { background-color: #2e7d32; color: #fff; }
+        .btn-success:hover { background-color: #388e3c; }
+        .btn-secondary { background-color: #444; color: #fff; text-decoration: none; display: inline-flex; align-items: center; }
+        .btn-secondary:hover { background-color: #555; }
+
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 12px; color: #aaa; margin-bottom: 6px; font-weight: bold; }
+
+        input[type="text"], input[type="date"], input[type="file"] {
+            width: 100%; background: #262626; border: 1px solid #555; color: #fff; padding: 8px; border-radius: 4px; font-size: 13px;
+        }
+        input:focus { border-color: #5b9bd5; outline: none; }
+
+        .form-row { display: flex; gap: 15px; }
+        .form-row .form-group { flex: 1; }
+
+        .preview-box { margin-top: 8px; display: flex; align-items: center; gap: 10px; font-size: 12px; }
+        .preview-box img { height: 32px; width: 32px; object-fit: contain; border: 1px solid #444; background: #000; padding: 2px; border-radius: 4px; }
+        .preview-box img.ci-preview { width: 240px; height: 72px; object-fit: contain; object-position: left center; background: #080808; padding: 5px; border-color: #333; border-radius: 6px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-bar">
+            <h1>프로젝트 설정 및 환경 관리</h1>
+            <button class="btn btn-secondary" onclick="location.href='/'">대시보드로 가기</button>
+        </div>
+
+        <div class="form-group">
+            <label>프로젝트 사업명</label>
+            <input type="text" id="projectTitleInput" placeholder="예: 통합관제 프로젝트">
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>프로젝트 시작일</label>
+                <input type="date" id="startDateInput">
+            </div>
+            <div class="form-group">
+                <label>프로젝트 종료일</label>
+                <input type="date" id="endDateInput">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>D-DAY 목표일</label>
+            <input type="date" id="targetDateInput">
+        </div>
+
+        <div class="form-group">
+                <label>회사 로고 이미지 (2단계에서 실제 저장 연동)</label>
+            <input type="file" id="logoInput" accept="image/*">
+            <div class="preview-box">
+                <span>현재 로고:</span>
+                <img src="/assets/kpetro-ci.png" alt="KPetro 코퍼레이트 심볼" class="ci-preview" onerror="this.style.display='none'">
+            </div>
+        </div>
+
+        <div class="form-group">
+                <label>파비콘 아이콘 (2단계에서 실제 저장 연동)</label>
+            <input type="file" id="faviconInput" accept=".ico, .png">
+            <div class="preview-box">
+                <span>현재 파비콘:</span>
+                <img src="/assets/kpetro-app-icon.png" alt="KPetro 앱 아이콘" onerror="this.style.display='none'">
+            </div>
+        </div>
+
+        <div style="margin-top: 25px; text-align: right;">
+            <button class="btn btn-success" style="padding: 10px 24px; font-size: 14px;" onclick="saveConfig()">설정 저장하기</button>
+        </div>
+    </div>
+
+    <script>
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const config = await res.json();
+                document.getElementById('projectTitleInput').value = config.project_title || '';
+                document.getElementById('targetDateInput').value = config.target_date || '';
+                document.getElementById('startDateInput').value = config.start_date || '';
+                document.getElementById('endDateInput').value = config.end_date || '';
+            } catch (e) {
+                console.error("설정 로드 실패:", e);
+            }
+        }
+
+        async function saveConfig() {
+            const title = document.getElementById('projectTitleInput').value.trim();
+            const sDate = document.getElementById('startDateInput').value;
+            const eDate = document.getElementById('endDateInput').value;
+            const tDate = document.getElementById('targetDateInput').value;
+            const logoFile = document.getElementById('logoInput').files[0];
+            const faviconFile = document.getElementById('faviconInput').files[0];
+
+            if (!title || !sDate || !eDate || !tDate) {
+                alert("모든 날짜와 사업명을 입력해 주세요.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('project_title', title);
+            formData.append('start_date', sDate);
+            formData.append('end_date', eDate);
+            formData.append('target_date', tDate);
+            if (logoFile) formData.append('logo', logoFile);
+            if (faviconFile) formData.append('favicon', faviconFile);
+
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    alert("설정이 저장되었습니다.");
+                    location.href = '/';
+                } else {
+                    alert("저장 실패");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("통신 중 에러가 발생했습니다.");
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", loadConfig);
+    </script>
+</body>
+</html>

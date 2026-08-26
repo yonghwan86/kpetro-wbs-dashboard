@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회의 관리 시스템</title>
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" href="/assets/kpetro-app-icon.png" type="image/png" sizes="512x512">
+    <script src="/assets/mock-api.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background-color: #121212; color: #e0e0e0; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; background: #1a1a1a; padding: 25px; border-radius: 10px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.8); }
+
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { font-size: 22px; color: #ffffff; }
+
+        .btn-group { display: flex; gap: 10px; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; transition: background 0.2s; }
+        .btn-primary { background-color: #2b4f73; color: #fff; border: 1px solid #5b9bd5; }
+        .btn-primary:hover { background-color: #3b6fa5; }
+        .btn-success { background-color: #2e7d32; color: #fff; }
+        .btn-success:hover { background-color: #388e3c; }
+        .btn-danger { background-color: #c62828; color: #fff; }
+        .btn-danger:hover { background-color: #d32f2f; }
+        .btn-secondary { background-color: #444; color: #fff; text-decoration: none; display: inline-flex; align-items: center; }
+        .btn-secondary:hover { background-color: #555; }
+
+        .search-bar { background: #222; padding: 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 20px; display: flex; gap: 15px; align-items: center; }
+        .search-group { display: flex; align-items: center; gap: 10px; }
+        .search-group label { font-size: 13px; color: #aaa; font-weight: bold; }
+        .search-group input { background: #2b2b2b; border: 1px solid #555; color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 13px; }
+
+        .layout-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; }
+        .panel { background: #222; border: 1px solid #444; border-radius: 8px; padding: 20px; max-height: 75vh; overflow-y: auto; }
+        .panel h2 { font-size: 16px; margin-bottom: 15px; color: #5b9bd5; border-bottom: 1px solid #444; padding-bottom: 8px; }
+
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; }
+        th, td { border: 1px solid #444; padding: 8px; }
+        th { background-color: #262626; color: #ddd; }
+        td { background-color: #1a1a1a; cursor: pointer; }
+        td:hover { background-color: #2a2a2a; }
+
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 12px; color: #aaa; margin-bottom: 4px; font-weight: bold; }
+        .form-group input, .form-group textarea { width: 100%; background: #2b2b2b; border: 1px solid #555; color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 13px; }
+        .form-group textarea { resize: vertical; height: 60px; }
+        .form-row { display: flex; gap: 10px; }
+        .form-row .form-group { flex: 1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-bar">
+            <h1>회의 관리 시스템</h1>
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="location.href='/'">대시보드로 가기</button>
+                <button class="btn btn-primary" onclick="resetForm()">+ 새 회의 등록</button>
+            </div>
+        </div>
+
+        <!-- 일자별 조회 바 -->
+        <div class="search-bar">
+            <div class="search-group">
+                <label>조회 일자</label>
+                <input type="date" id="searchDate" onchange="loadMeetings()">
+            </div>
+            <button class="btn btn-primary" onclick="loadMeetings()">해당일자 조회</button>
+            <button class="btn btn-secondary" onclick="loadAllMeetings()">전체 목록 보기</button>
+        </div>
+
+        <div class="layout-grid">
+            <!-- 좌측: 회의 목록 -->
+            <div class="panel">
+                <h2>회의 목록 (시간순 정렬)</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 35%;">일자 / 시간</th>
+                            <th>회의제목</th>
+                            <th style="width: 25%;">장소</th>
+                        </tr>
+                    </thead>
+                    <tbody id="meetingTableBody">
+                        <tr><td colspan="3" style="padding: 20px; color: #777;">조회된 회의가 없습니다.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 우측: 등록 / 상세 / 변경 / 요약 폼 -->
+            <div class="panel">
+                <h2 id="formTitle">회의 등록</h2>
+                <input type="hidden" id="meetingId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>회의제목 *</label>
+                        <input type="text" id="title" placeholder="회의 제목 입력">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>일자 *</label>
+                        <input type="date" id="meeting_date">
+                    </div>
+                    <div class="form-group">
+                        <label>시간 *</label>
+                        <input type="time" id="meeting_time">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>장소</label>
+                        <input type="text" id="location" placeholder="회의실 또는 온라인">
+                    </div>
+                    <div class="form-group">
+                        <label>참석대상자</label>
+                        <input type="text" id="attendees" placeholder="참석자 명단">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>주요안건</label>
+                    <textarea id="agenda" placeholder="주요 안건 내용"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>비밀번호 (변경/삭제 시 필요) *</label>
+                    <input type="password" id="password" placeholder="비밀번호 4자리 이상">
+                </div>
+                <div class="form-group">
+                    <label>회의내용</label>
+                    <textarea id="content" placeholder="상세 회의 내용"></textarea>
+                </div>
+                <div class="form-group" style="background: #2a2212; padding: 10px; border-radius: 6px; border: 1px solid #554422;">
+                    <label style="color: #e6c86e;">회의 종료 후 요약 (회의록 요약)</label>
+                    <textarea id="summary" placeholder="회의 종료 후 요약 내용을 입력하세요." style="height: 50px;"></textarea>
+                </div>
+
+                <!-- 복수 파일 첨부 및 다운로드 영역 -->
+                <div class="form-group">
+                    <label>첨부파일 (복수 선택 가능)</label>
+                    <input type="file" id="meetingFile" multiple style="padding: 3px;" onchange="previewFiles()">
+                    <div id="fileDownloadArea" style="margin-top: 6px; font-size: 12px; color: #aaa;">첨부된 파일 없음</div>
+                </div>
+
+                <div class="form-group">
+                    <label>기타</label>
+                    <input type="text" id="others" placeholder="기타 특이사항">
+                </div>
+
+                <div class="btn-group" style="margin-top: 15px; justify-content: flex-end;">
+                    <button class="btn btn-success" id="saveBtn" onclick="saveMeeting()">등록하기</button>
+                    <button class="btn btn-danger" id="deleteBtn" onclick="deleteMeeting()" style="display:none;">삭제하기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedMeetingId = null;
+        let currentMeetingFiles = []; // 기존 등록된 파일 목록 보관용
+
+        function formatTimeStr(timeVal) {
+            if (!timeVal) return '';
+            const parts = timeVal.toString().split(':');
+            if (parts.length >= 2) {
+                return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+            }
+            return timeVal;
+        }
+
+        async function fetchMeetings(url) {
+            try {
+                const res = await fetch(url);
+                const meetings = await res.json();
+                const tbody = document.getElementById('meetingTableBody');
+                tbody.innerHTML = '';
+
+                if (meetings.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" style="padding: 20px; color: #777;">조회된 회의가 없습니다.</td></tr>`;
+                    return;
+                }
+
+                meetings.forEach(m => {
+                    const tr = document.createElement('tr');
+                    tr.onclick = () => selectMeeting(m);
+                    const formattedTime = formatTimeStr(m.meeting_time);
+                    const hasFiles = m.files && m.files.length > 0;
+                    tr.innerHTML = `
+                        <td>${m.meeting_date} ${formattedTime}</td>
+                        <td style="text-align: left; padding-left: 10px; font-weight: bold;">${m.title} ${hasFiles ? '📎' : ''}</td>
+                        <td>${m.location || '-'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                console.error("회의 목록 조회 실패:", e);
+            }
+        }
+
+        function loadMeetings() {
+            const dateVal = document.getElementById('searchDate').value;
+            let url = '/api/meetings';
+            if (dateVal) url += `?date=${dateVal}`;
+            fetchMeetings(url);
+        }
+
+        function loadAllMeetings() {
+            fetchMeetings('/api/meetings');
+        }
+
+        function renderFileArea() {
+            const fileArea = document.getElementById('fileDownloadArea');
+            const fileInput = document.getElementById('meetingFile');
+
+            let html = '';
+
+            // 1. 기존 업로드된 파일 목록 표시
+            if (currentMeetingFiles && currentMeetingFiles.length > 0) {
+                html += '기존 첨부파일 목록:<ul style="margin-top: 4px; padding-left: 15px; margin-bottom: 8px;">';
+                currentMeetingFiles.forEach(f => {
+                    html += `<li style="margin-bottom: 3px;">
+                        <a href="#" onclick="downloadMockFile(${f.id}, '${String(f.file_name).replace(/'/g, "\\'")}'); return false;" style="color: #5b9bd5; text-decoration: underline;">${f.file_name}</a>
+                        <button type="button" onclick="deleteFile(${f.id})" style="background: #990000; color: #fff; border: none; padding: 1px 5px; border-radius: 3px; font-size: 10px; cursor: pointer; margin-left: 8px;">삭제</button>
+                    </li>`;
+                });
+                html += '</ul>';
+            }
+
+            // 2. 새로 선택한 파일 목록 미리보기 표시
+            if (fileInput.files && fileInput.files.length > 0) {
+                html += '새로 선택한 파일 (저장 시 추가됨):<ul style="margin-top: 4px; padding-left: 15px; color: #4ade80;">';
+                for (let i = 0; i < fileInput.files.length; i++) {
+                    html += `<li>${fileInput.files[i].name}</li>`;
+                }
+                html += '</ul>';
+            }
+
+            if (!currentMeetingFiles.length && (!fileInput.files || fileInput.files.length === 0)) {
+                html = '첨부된 파일 없음';
+            }
+
+            fileArea.innerHTML = html;
+        }
+
+        function previewFiles() {
+            renderFileArea();
+        }
+
+        function selectMeeting(m) {
+            selectedMeetingId = m.id;
+            currentMeetingFiles = m.files || [];
+
+            document.getElementById('meetingId').value = m.id;
+            document.getElementById('title').value = m.title || '';
+            document.getElementById('meeting_date').value = m.meeting_date || '';
+            document.getElementById('meeting_time').value = formatTimeStr(m.meeting_time);
+            document.getElementById('location').value = m.location || '';
+            document.getElementById('attendees').value = m.attendees || '';
+            document.getElementById('agenda').value = m.agenda || '';
+            document.getElementById('password').value = m.password || '';
+            document.getElementById('content').value = m.content || '';
+            document.getElementById('summary').value = m.summary || '';
+            document.getElementById('others').value = m.others || '';
+            document.getElementById('meetingFile').value = '';
+
+            renderFileArea();
+
+            document.getElementById('formTitle').innerText = "회의 상세 조회 및 변경 / 요약";
+            document.getElementById('saveBtn').innerText = "변경사항 저장";
+            document.getElementById('deleteBtn').style.display = "inline-block";
+        }
+
+        async function deleteFile(fileId) {
+            if (!confirm("이 첨부파일을 삭제하시겠습니까?")) return;
+            try {
+                const res = await fetch(`/api/meeting-files/${fileId}`, { method: 'DELETE' });
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    alert("파일이 삭제되었습니다.");
+                    loadMeetings();
+                    currentMeetingFiles = currentMeetingFiles.filter(x => x.id !== fileId);
+                    renderFileArea();
+                } else {
+                    alert("파일 삭제 실패");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("서버 통신 중 에러가 발생했습니다.");
+            }
+        }
+
+        function resetForm() {
+            selectedMeetingId = null;
+            currentMeetingFiles = [];
+
+            document.getElementById('meetingId').value = '';
+            document.getElementById('title').value = '';
+            document.getElementById('meeting_date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('meeting_time').value = '10:00';
+            document.getElementById('location').value = '';
+            document.getElementById('attendees').value = '';
+            document.getElementById('agenda').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('content').value = '';
+            document.getElementById('summary').value = '';
+            document.getElementById('others').value = '';
+            document.getElementById('meetingFile').value = '';
+
+            renderFileArea();
+
+            document.getElementById('formTitle').innerText = "새 회의 등록";
+            document.getElementById('saveBtn').innerText = "등록하기";
+            document.getElementById('deleteBtn').style.display = "none";
+        }
+
+        async function saveMeeting() {
+            const formData = new FormData();
+            formData.append('title', document.getElementById('title').value.trim());
+            formData.append('meeting_date', document.getElementById('meeting_date').value);
+            formData.append('meeting_time', document.getElementById('meeting_time').value);
+            formData.append('location', document.getElementById('location').value.trim());
+            formData.append('attendees', document.getElementById('attendees').value.trim());
+            formData.append('agenda', document.getElementById('agenda').value.trim());
+            formData.append('password', document.getElementById('password').value.trim());
+            formData.append('content', document.getElementById('content').value.trim());
+            formData.append('summary', document.getElementById('summary').value.trim());
+            formData.append('others', document.getElementById('others').value.trim());
+
+            const fileInput = document.getElementById('meetingFile');
+            for (let i = 0; i < fileInput.files.length; i++) {
+                formData.append('file', fileInput.files[i]);
+            }
+
+            if (!formData.get('title') || !formData.get('meeting_date') || !formData.get('meeting_time') || !formData.get('password')) {
+                alert("회의제목, 일자, 시간, 비밀번호는 필수 입력 항목입니다.");
+                return;
+            }
+
+            const url = selectedMeetingId ? `/api/meetings/${selectedMeetingId}` : '/api/meetings';
+            const method = selectedMeetingId ? 'PUT' : 'POST';
+
+            try {
+                const res = await fetch(url, {
+                    method: method,
+                    body: formData
+                });
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    alert(selectedMeetingId ? "회의 정보가 성공적으로 변경되었습니다." : "새 회의가 등록되었습니다.");
+                    loadMeetings();
+                    if (!selectedMeetingId) resetForm();
+                    else {
+                        const resMeetings = await fetch('/api/meetings');
+                        const meetings = await resMeetings.json();
+                        const updated = meetings.find(x => x.id === selectedMeetingId);
+                        if (updated) selectMeeting(updated);
+                    }
+                } else {
+                    alert("저장 실패");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("서버 통신 중 에러가 발생했습니다.");
+            }
+        }
+
+        async function deleteMeeting() {
+            if (!selectedMeetingId) return;
+            const pw = prompt("삭제하려면 등록 시 입력한 비밀번호를 입력하세요.");
+            if (!pw) return;
+
+            try {
+                const res = await fetch(`/api/meetings/${selectedMeetingId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pw })
+                });
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    alert("회의가 삭제되었습니다.");
+                    loadMeetings();
+                    resetForm();
+                } else {
+                    alert(result.message || "비밀번호가 일치하지 않습니다.");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("삭제 통신 중 에러가 발생했습니다.");
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById('searchDate').value = new Date().toISOString().split('T')[0];
+            resetForm();
+            loadMeetings();
+        });
+    </script>
+</body>
+</html>
