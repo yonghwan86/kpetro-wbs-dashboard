@@ -521,9 +521,9 @@
                     const state = await resWbs.json();
 
                     if (weekly && weekly.labels) {
-                        progressChart.data.labels = weekly.labels;
-                        progressChart.data.datasets[0].data = weekly.plan;
-                        progressChart.data.datasets[1].data = weekly.actual;
+                        progressChart.data.labels = weekMapping.map((item, index) => weekly.labels[index] || `${item.globalW}주차`);
+                        progressChart.data.datasets[0].data = weekMapping.map((item, index) => weekly.plan[index] ?? null);
+                        progressChart.data.datasets[1].data = weekMapping.map((item, index) => weekly.actual[index] ?? null);
                         progressChart.update();
                     }
 

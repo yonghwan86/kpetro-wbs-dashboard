@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { makeWbsTemplate, parseWbsWorkbook } from '../api/_lib/excel.js';
+import { projectWeekCount } from '../api/_lib/dates.js';
 import { createSessionToken, hashPassword, verifyPassword, verifySessionToken } from '../api/_lib/security.js';
 
 test('password hashing and signed session token', () => {
@@ -28,4 +29,11 @@ test('generated WBS workbook can be parsed', async () => {
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }
+});
+
+test('project weeks include both start and end dates', () => {
+  assert.equal(projectWeekCount('2026-08-01', '2026-12-21'), 21);
+  assert.equal(projectWeekCount('2026-08-01', '2026-12-31'), 22);
+  assert.equal(projectWeekCount('2026-08-01', '2026-08-07'), 1);
+  assert.equal(projectWeekCount('2026-08-01', '2026-08-08'), 2);
 });

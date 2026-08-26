@@ -4,6 +4,7 @@ import formidable from 'formidable';
 import { del, get, put } from '@vercel/blob';
 import { handleUpload } from '@vercel/blob/client';
 import { ensureSchema, sql, dateString, getUserById } from './_lib/db.js';
+import { projectWeekCount } from './_lib/dates.js';
 import {
   clearSessionCookie, getSessionSubject, hashPassword, hasPermission, normalizePermissions,
   parsePermissions, randomPassword, sameOrigin, setSessionCookie, verifyPassword,
@@ -231,7 +232,13 @@ async function wbsImportHandler(req,res,user){
 }
 
 async function weeklyHandler(req,res,user){
-  if(req.method==='GET'){const rows=await sql`SELECT * FROM wbs_weekly ORDER BY week_no`;return json(res,200,{labels:rows.map(r=>`${r.week_no}주차`),plan:rows.map(r=>Number(r.plan_rate||0)),actual:rows.map(r=>r.actual_rate===null?null:Number(r.actual_rate))});}
+  if(req.method==='GET'){
+    const [rows,configRows]=await Promise.all([sql`SELECT * FROM wbs_weekly ORDER BY week_no`,sql`SELECT start_date,end_date FROM project_config WHERE id=1`]);
+    const project=configRows[0]||{};
+    const totalWeeks=projectWeekCount(dateString(project.start_date),dateString(project.end_date));
+    const visibleRows=totalWeeks?rows.filter(row=>Number(row.week_no)<=totalWeeks):rows;
+    return json(res,200,{labels:visibleRows.map(r=>`${r.week_no}주차`),plan:visibleRows.map(r=>Number(r.plan_rate||0)),actual:visibleRows.map(r=>r.actual_rate===null?null:Number(r.actual_rate))});
+  }
   if(!requireUser(res,user,'weekly'))return;const data=await readJson(req);if(!Array.isArray(data)||!data.length)return json(res,400,{status:'error',message:'저장할 주차별 데이터가 없습니다.'});
   await sql.begin(async tx=>{for(const item of data){const week=Number(String(item.week_no??item.week).match(/\d+/)?.[0]);if(!week)throw new Error('주차 값이 올바르지 않습니다.');await tx`INSERT INTO wbs_weekly(week_no,plan_rate,actual_rate,updated_at)VALUES(${week},${numberValue(item.plan_rate??item.plan)},${item.actual_rate==null||item.actual_rate===''?null:numberValue(item.actual_rate??item.actual)},NOW())ON CONFLICT(week_no)DO UPDATE SET plan_rate=EXCLUDED.plan_rate,actual_rate=EXCLUDED.actual_rate,updated_at=NOW()`;}});
   return json(res,200,{status:'success',message:'성공적으로 저장되었습니다.'});

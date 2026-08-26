@@ -60,20 +60,20 @@
         async function loadWeeklyData() {
             try {
                 // 1. 프로젝트 설정(시작일, 종료일) 불러오기
-                const configRes = await fetch('/api/config');
+                const configRes = await fetch('/api/config', { cache: 'no-store' });
                 const config = await configRes.json();
 
                 if (config.start_date && config.end_date) {
                     const start = new Date(config.start_date);
                     const end = new Date(config.end_date);
-                    const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+                    const totalDays = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
                     calculatedTotalWeeks = Math.max(1, Math.ceil(totalDays / 7));
                 } else {
                     calculatedTotalWeeks = 21; // 기본값
                 }
 
                 // 2. 주차별 진척 데이터 불러오기
-                const res = await fetch('/api/weekly');
+                const res = await fetch('/api/weekly', { cache: 'no-store' });
                 const data = await res.json();
 
                 const tbody = document.getElementById('weeklyTableBody');
