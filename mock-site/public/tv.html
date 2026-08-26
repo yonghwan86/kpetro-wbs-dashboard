@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="refresh" content="3600">
-    <meta name="kpetro-build" content="2026-08-26-tv-visibility-v3">
+    <meta name="kpetro-build" content="2026-08-26-dashboard-performance-v4">
     <title id="pageTitle">프로젝트 구축 현황</title>
     <meta name="robots" content="noindex,nofollow,noarchive">
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="icon" href="/assets/kpetro-app-icon.png" type="image/png" sizes="512x512">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <script defer src="/assets/chart-3.9.1.min.js"></script>
+    <script defer src="/assets/chartjs-plugin-datalabels-2.2.0.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { width: 100%; height: 100%; min-height: 100%; overflow: hidden; font-family: Arial, 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', sans-serif; background-color: #121212; color: #f0f0f0; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
@@ -85,7 +85,7 @@
         .bottom-nav { min-height: 0; display: flex; justify-content: center; gap: 9px; padding-top: 3px; flex-wrap: nowrap; overflow: hidden; }
         .nav-btn { background-color: #2b4f73; color: #fff; border: 1px solid #5b9bd5; padding: 8px 20px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; text-decoration: none; transition: background 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
         .nav-btn:hover { background-color: #3b6fa5; }
-        body.tv-display { grid-template-rows: clamp(120px, 17vh, 190px) clamp(220px, 35vh, 400px) minmax(0, 1fr); }
+        body.tv-display { grid-template-rows: clamp(120px, 17vh, 190px) clamp(290px, 50vh, 560px) minmax(0, 1fr); }
         body.tv-display .bottom-nav { display: none; }
         body.tv-display table { font-size: 14px; font-size: clamp(14px, 0.9vw, 17px); }
         body.tv-display .diff-filter button { font-size: 12px; font-size: clamp(12px, 0.7vw, 14px); }
@@ -126,7 +126,7 @@
             .nav-btn { padding: 6px 14px; font-size: 12px; }
             table { font-size: 13px; }
             .diff-filter button { font-size: 11px; }
-            body.tv-display { grid-template-rows: clamp(105px, 17vh, 145px) clamp(210px, 35vh, 285px) minmax(0, 1fr); }
+            body.tv-display { grid-template-rows: clamp(105px, 17vh, 145px) clamp(290px, 50vh, 370px) minmax(0, 1fr); }
         }
 
         /* --- A4 한 페이지 인쇄 최적화 스타일 --- */
@@ -169,7 +169,7 @@
     <div class="d-day-section">
         <div class="brand-area">
             <div class="brand-lockup">
-                <img src="/api/branding/logo" alt="KPetro 코퍼레이트 심볼" class="brand-logo" onerror="this.src='/assets/kpetro-ci.png'">
+                <img src="/assets/kpetro-ci.png" alt="KPetro 코퍼레이트 심볼" class="brand-logo" onerror="this.src='/assets/kpetro-ci.png'">
             </div>
         </div>
         <div class="d-day-center">
@@ -287,11 +287,17 @@
             window.updateDashboard();
         }
 
-        function openDelayModal(systemName, phaseName, item) {
+        async function openDelayModal(systemName, phaseName, item) {
+            const response = await fetch(`/api/wbs/delay?system_name=${encodeURIComponent(systemName)}&phase_name=${encodeURIComponent(phaseName)}`);
+            if (response.status === 401 || response.status === 428) {
+                location.href = '/login?next=' + encodeURIComponent(location.pathname);
+                return;
+            }
+            const details = response.ok ? await response.json() : item;
             editingDelayItem = { systemName, phaseName };
             document.getElementById('delayModalTitle').textContent = `${cleanDisplayLabel(systemName)} > ${cleanDisplayLabel(phaseName)} 지연 관리`;
-            document.getElementById('delayReason').value = item.delay_reason || '';
-            document.getElementById('recoveryPlan').value = item.recovery_plan || '';
+            document.getElementById('delayReason').value = details.delay_reason || '';
+            document.getElementById('recoveryPlan').value = details.recovery_plan || '';
             document.getElementById('delayModal').style.display = 'flex';
         }
 
@@ -429,10 +435,8 @@
             }
 
             let targetTimestamp = new Date('2026-11-01T00:00:00').getTime();
-            async function initProjectConfig() {
+            function applyProjectConfig(config) {
                 try {
-                    const res = await fetch('/api/config', { cache: 'no-store' });
-                    const config = await res.json();
                     if (config.project_title) {
                         document.getElementById('dDayTitle').innerText = config.project_title + ' D-DAY';
                         document.getElementById('pageTitle').innerText = config.project_title + ' 현황';
@@ -449,6 +453,9 @@
                     buildColGroups();
                     buildMonthHeader();
                     buildWeekHeader();
+                    const logo = document.querySelector('.brand-logo');
+                    const logoSource = config.has_custom_logo ? '/api/branding/logo' : '/assets/kpetro-ci.png';
+                    if (logo.getAttribute('src') !== logoSource) logo.src = logoSource;
                 } catch(e) { console.error(e); }
             }
 
@@ -484,7 +491,7 @@
                         y: { min: 0, max: 100, ticks: { color: '#f0f0f0', font: { size: 12, weight: '600' }, callback: v => v + '%' }, grid: { color: '#3c3c3c' } },
                         x: {
                             ticks: {
-                                color: '#f0f0f0', font: { size: 13, weight: '600' }, maxRotation: 0, minRotation: 0,
+                                color: '#f0f0f0', font: { size: 13, weight: '600' }, autoSkip: false, maxRotation: 0, minRotation: 0,
                                 callback: function(val, index) {
                                     // 그래프 하단 축 라벨에서도 번호 제거
                                     return cleanDisplayLabel(this.getLabelForValue(val));
@@ -503,6 +510,7 @@
                 data: { labels: [], datasets: [
                     {
                         label: '계획', data: [], borderColor: '#5b9bd5', tension: 0.1,
+                        clip: false,
                         pointRadius: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? 7 : 3,
                         pointBackgroundColor: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? '#ffffff' : '#5b9bd5',
                         pointBorderColor: '#5b9bd5', pointBorderWidth: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? 3 : 1,
@@ -510,6 +518,7 @@
                     },
                     {
                         label: '실적', data: [], borderColor: '#ed7d31', tension: 0.1,
+                        clip: false,
                         pointRadius: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? 7 : 3,
                         pointBackgroundColor: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? '#ffffff' : '#ed7d31',
                         pointBorderColor: '#ed7d31', pointBorderWidth: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? 3 : 1,
@@ -518,10 +527,10 @@
                 ]},
                 options: {
                     responsive: true, maintainAspectRatio: false, animation: false, devicePixelRatio: chartPixelRatio, resizeDelay: 150,
-                    layout: { padding: { top: 15, bottom: 15 } },
+                    layout: { padding: { top: 22, right: 20, bottom: 15, left: 4 } },
                     scales: {
-                        y: { min: 0, max: 100, ticks: { color: '#f0f0f0', font: { size: 12, weight: '600' }, callback: v => v + '%' }, grid: { color: '#3c3c3c' } },
-                        x: { ticks: { color: '#f0f0f0', font: { size: 12, weight: '600' }, minRotation: 45, maxRotation: 45, padding: 3 }, grid: { color: '#3c3c3c' } }
+                        y: { min: 0, max: 110, ticks: { stepSize: 20, color: '#f0f0f0', font: { size: 12, weight: '600' }, callback: v => v <= 100 ? v + '%' : '' }, grid: { color: '#3c3c3c' } },
+                        x: { offset: true, ticks: { color: '#f0f0f0', font: { size: 12, weight: '600' }, minRotation: 45, maxRotation: 45, padding: 3 }, grid: { color: '#3c3c3c' } }
                     },
                     plugins: { legend: { labels: { color: '#fff', boxWidth: 13, font: { size: 12, weight: '700' } } } }
                 }
@@ -529,12 +538,12 @@
 
             window.updateDashboard = async function() {
                 try {
-                    const [resWeekly, resWbs] = await Promise.all([
-                        fetch('/api/weekly', { cache: 'no-store' }),
-                        fetch('/api/wbs', { cache: 'no-store' })
-                    ]);
-                    const weekly = await resWeekly.json();
-                    const state = await resWbs.json();
+                    const response = await fetch('/api/dashboard');
+                    if (!response.ok) throw new Error('대시보드 통합 데이터를 불러오지 못했습니다.');
+                    const snapshot = await response.json();
+                    applyProjectConfig(snapshot.config || {});
+                    const weekly = snapshot.weekly || {};
+                    const state = snapshot.wbs || {};
 
                     if (weekly && weekly.labels) {
                         progressChart.data.labels = weekMapping.map((item, index) => weekly.labels[index] || `${item.globalW}주차`);
@@ -641,10 +650,7 @@
                 } catch(e) { console.error(e); }
             }
 
-            initProjectConfig().then(() => {
-                updateTimer();
-                updateDashboard();
-            });
+            updateDashboard().then(updateTimer);
             setInterval(updateDashboard, 60 * 60 * 1000);
         });
     </script>

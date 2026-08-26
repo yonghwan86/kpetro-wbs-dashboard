@@ -6,6 +6,8 @@ const output = path.join(root, 'public');
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 await cp(path.join(root, 'assets'), path.join(output, 'assets'), { recursive: true });
+await cp(path.join(root, 'node_modules', 'chart.js', 'dist', 'chart.min.js'), path.join(output, 'assets', 'chart-3.9.1.min.js'));
+await cp(path.join(root, 'node_modules', 'chartjs-plugin-datalabels', 'dist', 'chartjs-plugin-datalabels.min.js'), path.join(output, 'assets', 'chartjs-plugin-datalabels-2.2.0.min.js'));
 
 for (const entry of await readdir(root, { withFileTypes: true })) {
   if (entry.isFile() && (entry.name.endsWith('.html') || entry.name === 'favicon.ico')) {

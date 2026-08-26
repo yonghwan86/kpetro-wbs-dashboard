@@ -1,15 +1,11 @@
 import fs from 'node:fs';
 import { Readable } from 'node:stream';
-import formidable from 'formidable';
-import { del, get, put } from '@vercel/blob';
-import { handleUpload } from '@vercel/blob/client';
 import { ensureSchema, sql, dateString, getUserById } from './_lib/db.js';
 import { projectWeekCount } from './_lib/dates.js';
 import {
   clearSessionCookie, getSessionSubject, hashPassword, hasPermission, normalizePermissions,
   parsePermissions, randomPassword, sameOrigin, setSessionCookie, verifyPassword,
 } from './_lib/security.js';
-import { makeWbsTemplate, parseUserWorkbook, parseWbsWorkbook } from './_lib/excel.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -34,7 +30,8 @@ async function readJson(req) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
-function parseForm(req, options = {}) {
+async function parseForm(req, options = {}) {
+  const { default: formidable } = await import('formidable');
   const form = formidable({ multiples: true, maxFiles: 20, maxFileSize: options.maxFileSize || MAX_FILE_SIZE, allowEmptyFiles: false });
   return new Promise((resolve, reject) => form.parse(req, (error, fields, files) => error ? reject(error) : resolve({ fields, files })));
 }
@@ -76,14 +73,15 @@ async function configHandler(req, res, user) {
   let faviconUrl = null;
   const logo = fileList(files, 'logo')[0];
   const favicon = fileList(files, 'favicon')[0];
+  const blobStorage = logo || favicon ? await import('@vercel/blob') : null;
   if (logo) {
     if (!/^image\/(png|jpeg|webp)$/.test(logo.mimetype || '')) return json(res, 400, { success:false, message:'로고는 JPG, PNG, WEBP만 사용할 수 있습니다.' });
-    const blob = await put(`branding/logo-${Date.now()}-${clean(logo.originalFilename, 100)}`, fs.readFileSync(logo.filepath), { access:'private', contentType:logo.mimetype, addRandomSuffix:true });
+    const blob = await blobStorage.put(`branding/logo-${Date.now()}-${clean(logo.originalFilename, 100)}`, fs.readFileSync(logo.filepath), { access:'private', contentType:logo.mimetype, addRandomSuffix:true });
     logoUrl = blob.url;
   }
   if (favicon) {
     if (!/^(image\/png|image\/x-icon|image\/vnd.microsoft.icon)$/.test(favicon.mimetype || '')) return json(res, 400, { success:false, message:'파비콘은 ICO 또는 PNG만 사용할 수 있습니다.' });
-    const blob = await put(`branding/favicon-${Date.now()}-${clean(favicon.originalFilename, 100)}`, fs.readFileSync(favicon.filepath), { access:'private', contentType:favicon.mimetype, addRandomSuffix:true });
+    const blob = await blobStorage.put(`branding/favicon-${Date.now()}-${clean(favicon.originalFilename, 100)}`, fs.readFileSync(favicon.filepath), { access:'private', contentType:favicon.mimetype, addRandomSuffix:true });
     faviconUrl = blob.url;
   }
   await sql`UPDATE project_config SET project_title=${clean(value(fields.project_title),100)}, target_date=${value(fields.target_date)||null},
@@ -142,6 +140,7 @@ async function userImportHandler(req,res,user) {
   const { files }=await parseForm(req,{maxFileSize:MAX_EXCEL_SIZE});
   const file=fileList(files,'file')[0];
   if (!file || !/\.xlsx$/i.test(file.originalFilename||'')) return json(res,400,{success:false,message:'엑셀(.xlsx) 파일을 선택해주세요.'});
+  const { parseUserWorkbook } = await import('./_lib/excel.js');
   const rows=await parseUserWorkbook(file.filepath);
   const created=[];
   let imported=0;
@@ -210,7 +209,12 @@ async function wbsHandler(req,res,user){
 }
 
 async function delayHandler(req,res,user){
-  if(!requireUser(res,user,'dashboard'))return;const data=await readJson(req);
+  if(!requireUser(res,user,'dashboard'))return;
+  if(req.method==='GET'){
+    const rows=await sql`SELECT delay_reason,recovery_plan FROM wbs_progress WHERE system_name=${clean(req.query.system_name,100)} AND phase_name=${clean(req.query.phase_name,100)}`;
+    return rows.length?json(res,200,{delay_reason:rows[0].delay_reason||'',recovery_plan:rows[0].recovery_plan||''}):json(res,404,{success:false,message:'해당 WBS 항목을 찾을 수 없습니다.'});
+  }
+  const data=await readJson(req);
   const rows=await sql`UPDATE wbs_progress SET delay_reason=${clean(data.delay_reason,10000)},recovery_plan=${clean(data.recovery_plan,10000)},updated_at=NOW()
     WHERE system_name=${clean(data.system_name,100)} AND phase_name=${clean(data.phase_name,100)} RETURNING system_name`;
   return rows.length?json(res,200,{success:true}):json(res,404,{success:false,message:'해당 WBS 항목을 찾을 수 없습니다.'});
@@ -219,6 +223,7 @@ async function delayHandler(req,res,user){
 async function wbsImportHandler(req,res,user){
   if(!requireUser(res,user,'input'))return;const {fields,files}=await parseForm(req,{maxFileSize:MAX_EXCEL_SIZE});const file=fileList(files,'file')[0];
   if(!file||!/\.xlsx$/i.test(file.originalFilename||''))return json(res,400,{success:false,message:'엑셀(.xlsx) 파일을 선택해주세요.'});
+  const { parseWbsWorkbook } = await import('./_lib/excel.js');
   const parsed=await parseWbsWorkbook(file.filepath);const mode=value(fields.mode)||'preview';
   if(mode!=='apply')return json(res,200,{success:true,preview:true,wbs_count:parsed.wbs.length,weekly_count:parsed.weekly.length,rows:parsed.wbs.slice(0,8),sheet_names:parsed.sheetNames});
   await sql.begin(async tx=>{
@@ -264,7 +269,9 @@ async function meetingItemHandler(req,res,user,id){
   const data=await readJson(req);
   if(req.method==='DELETE'){
     if(!verifyPassword(existing.password,data.password))return json(res,403,{success:false,message:'비밀번호가 일치하지 않습니다.'});
-    const files=await sql`SELECT blob_url FROM meeting_files WHERE meeting_id=${id}`;if(files.length)await del(files.map(f=>f.blob_url));await sql`DELETE FROM meetings WHERE id=${id}`;return json(res,200,{success:true});
+    const files=await sql`SELECT blob_url FROM meeting_files WHERE meeting_id=${id}`;
+    if(files.length){const { del }=await import('@vercel/blob');await del(files.map(f=>f.blob_url));}
+    await sql`DELETE FROM meetings WHERE id=${id}`;return json(res,200,{success:true});
   }
   const title=clean(data.title,150);if(!title)return json(res,400,{success:false,message:'회의명은 필수입니다.'});
   const passwordHash=data.password?hashPassword(String(data.password)):existing.password;
@@ -274,14 +281,15 @@ async function meetingItemHandler(req,res,user,id){
 
 async function fileHandler(req,res,user,id,download){
   if(!requireUser(res,user,'meetings'))return;const row=(await sql`SELECT * FROM meeting_files WHERE id=${id}`)[0];if(!row)return json(res,404,{success:false,message:'파일을 찾을 수 없습니다.'});
-  if(download){const response=await get(row.blob_url,{access:'private'});if(!response||response.statusCode!==200)return json(res,404,{success:false,message:'저장된 파일이 없습니다.'});res.statusCode=200;res.setHeader('Content-Type',row.content_type||response.blob.contentType||'application/octet-stream');res.setHeader('Content-Disposition',`attachment; filename*=UTF-8''${encodeURIComponent(row.file_name)}`);Readable.fromWeb(response.stream).pipe(res);return;}
-  await del(row.blob_url);await sql`DELETE FROM meeting_files WHERE id=${id}`;return json(res,200,{success:true});
+  if(download){const { get }=await import('@vercel/blob');const response=await get(row.blob_url,{access:'private'});if(!response||response.statusCode!==200)return json(res,404,{success:false,message:'저장된 파일이 없습니다.'});res.statusCode=200;res.setHeader('Content-Type',row.content_type||response.blob.contentType||'application/octet-stream');res.setHeader('Content-Disposition',`attachment; filename*=UTF-8''${encodeURIComponent(row.file_name)}`);Readable.fromWeb(response.stream).pipe(res);return;}
+  const { del }=await import('@vercel/blob');await del(row.blob_url);await sql`DELETE FROM meeting_files WHERE id=${id}`;return json(res,200,{success:true});
 }
 
 async function brandingHandler(res,type){
   const rows=await sql`SELECT logo_url,favicon_url FROM project_config WHERE id=1`;
   const url=type==='favicon'?rows[0]?.favicon_url:rows[0]?.logo_url;
   if(!url){res.statusCode=302;res.setHeader('Location',type==='favicon'?'/assets/kpetro-app-icon.png':'/assets/kpetro-ci.png');return res.end();}
+  const { get }=await import('@vercel/blob');
   const response=await get(url,{access:'private'});if(!response||response.statusCode!==200){return json(res,404,{success:false,message:'브랜딩 파일을 찾을 수 없습니다.'});}
   res.statusCode=200;res.setHeader('Content-Type',response.blob.contentType||'image/png');res.setHeader('Cache-Control','public, max-age=300');Readable.fromWeb(response.stream).pipe(res);
 }
@@ -289,6 +297,7 @@ async function brandingHandler(res,type){
 async function blobUploadHandler(req,res,user){
   const body=await readJson(req);
   if(body?.type==='blob.generate-client-token'&&!requireUser(res,user,'meetings'))return;
+  const { handleUpload }=await import('@vercel/blob/client');
   const result=await handleUpload({body,request:req,onBeforeGenerateToken:async(pathname,clientPayload)=>{
     const payload=JSON.parse(clientPayload||'{}');const meetingId=Number(payload.meetingId);if(!meetingId)throw new Error('회의 ID가 필요합니다.');const exists=await sql`SELECT id FROM meetings WHERE id=${meetingId}`;if(!exists.length)throw new Error('회의를 찾을 수 없습니다.');
     const extension=String(payload.fileName||pathname).split('.').pop().toLowerCase();if(!ALLOWED_EXTENSIONS.has(extension))throw new Error('허용되지 않는 첨부파일 형식입니다.');
@@ -315,9 +324,9 @@ export default async function handler(req,res){
     let match=route.match(/^users\/(.+)\/reset-password$/);if(match&&req.method==='POST')return userResetHandler(req,res,user,decodeURIComponent(match[1]));
     if(route==='codes')return codesHandler(req,res,user);
     if(route==='wbs')return wbsHandler(req,res,user);
-    if(route==='wbs/delay'&&req.method==='POST')return delayHandler(req,res,user);
+    if(route==='wbs/delay'&&['GET','POST'].includes(req.method))return delayHandler(req,res,user);
     if(route==='wbs/import'&&req.method==='POST')return wbsImportHandler(req,res,user);
-    if(route==='wbs/template'&&req.method==='GET'){if(!requireUser(res,user,'input'))return;const buffer=await makeWbsTemplate();res.statusCode=200;res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');res.setHeader('Content-Disposition',"attachment; filename*=UTF-8''KPetro_WBS_import_template.xlsx");return res.end(buffer);}
+    if(route==='wbs/template'&&req.method==='GET'){if(!requireUser(res,user,'input'))return;const { makeWbsTemplate }=await import('./_lib/excel.js');const buffer=await makeWbsTemplate();res.statusCode=200;res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');res.setHeader('Content-Disposition',"attachment; filename*=UTF-8''KPetro_WBS_import_template.xlsx");return res.end(buffer);}
     if(route==='weekly')return weeklyHandler(req,res,user);
     if(route==='meetings')return meetingsHandler(req,res,user);
     match=route.match(/^meetings\/(\d+)$/);if(match&&['PUT','DELETE'].includes(req.method))return meetingItemHandler(req,res,user,Number(match[1]));

@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@vercel/blob": "^2.3.0",
+    "chart.js": "^3.9.1",
+    "chartjs-plugin-datalabels": "^2.2.0",
     "exceljs": "^4.4.0",
     "formidable": "^3.5.4",
     "postgres": "^3.4.7"

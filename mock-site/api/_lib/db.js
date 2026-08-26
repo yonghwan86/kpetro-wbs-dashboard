@@ -1,15 +1,7 @@
-import postgres from 'postgres';
 import { hashPassword } from './security.js';
+import { sql } from './sql.js';
 
-if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not configured');
-
-export const sql = postgres(process.env.DATABASE_URL, {
-  ssl: 'require',
-  max: 3,
-  idle_timeout: 20,
-  connect_timeout: 15,
-  onnotice: () => {},
-});
+export { sql };
 
 const INITIAL_WBS = [
   ['1. 수급가격통합시스템','1. 공통',10,7.3,7.3,'2026-08-19','2026-09-02','2026-08-19'],
@@ -39,9 +31,14 @@ export function ensureSchema() {
 }
 
 async function initializeSchema() {
-  await sql`CREATE TABLE IF NOT EXISTS app_meta (key VARCHAR(100) PRIMARY KEY, value TEXT, updated_at TIMESTAMPTZ DEFAULT NOW())`;
-  const versionRows = await sql`SELECT value FROM app_meta WHERE key='schema_version'`;
+  let versionRows = [];
+  try {
+    versionRows = await sql`SELECT value FROM app_meta WHERE key='schema_version'`;
+  } catch (error) {
+    if (error?.code !== '42P01') throw error;
+  }
   if (Number(versionRows[0]?.value || 0) >= 2) return;
+  await sql`CREATE TABLE IF NOT EXISTS app_meta (key VARCHAR(100) PRIMARY KEY, value TEXT, updated_at TIMESTAMPTZ DEFAULT NOW())`;
   await sql`
     CREATE TABLE IF NOT EXISTS project_config (
       id INTEGER PRIMARY KEY, project_title VARCHAR(100), target_date DATE,
