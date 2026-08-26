@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="refresh" content="3600">
+    <meta name="kpetro-build" content="2026-08-26-tv-layout-v2">
     <title id="pageTitle">프로젝트 구축 현황</title>
     <meta name="robots" content="noindex,nofollow,noarchive">
     <link rel="icon" href="/favicon.ico" sizes="any">
@@ -12,10 +13,16 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { width: 100%; height: 100vh; overflow: hidden; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background-color: #121212; color: #e0e0e0; }
-        body { display: flex; flex-direction: column; padding: 1.5vh 1.5vw; gap: 1.2vh; }
+        html, body { width: 100%; height: 100%; min-height: 100%; overflow: hidden; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background-color: #121212; color: #e0e0e0; }
+        body {
+            display: grid;
+            grid-template-rows: 17vh 27vh minmax(0, 1fr) auto;
+            grid-template-rows: clamp(120px, 17vh, 190px) clamp(170px, 27vh, 305px) minmax(0, 1fr) auto;
+            padding: 1.2vh 1.2vw;
+            gap: 1vh;
+        }
 
-        .d-day-section { flex: 0 0 auto; background-color: #000000; padding: 2vh 20px; border-radius: 12px; display: grid; grid-template-columns: minmax(285px, 0.8fr) minmax(520px, 2fr) minmax(285px, 0.8fr); align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.8); border: 1px solid #222; position: relative; }
+        .d-day-section { min-height: 0; height: 100%; background-color: #000000; padding: 1.2vh 20px; border-radius: 12px; display: grid; grid-template-columns: minmax(285px, 0.8fr) minmax(520px, 2fr) minmax(285px, 0.8fr); align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.8); border: 1px solid #222; position: relative; overflow: hidden; }
         .brand-area { display: flex; justify-content: flex-start; align-items: center; min-width: 0; padding-left: 10px; }
         .brand-lockup { width: 275px; height: 78px; display: flex; align-items: center; justify-content: flex-start; }
         .brand-logo { display: block; width: 100%; height: 100%; object-fit: contain; object-position: left center; image-rendering: auto; }
@@ -29,12 +36,22 @@
         .time-label { color: #999999; font-size: 14px; font-size: clamp(12px, 1.2vw, 18px); margin-top: 0.5vh; font-weight: bold; }
         .time-colon { color: #444444; font-size: 38px; font-size: clamp(20px, 3.5vw, 50px); font-weight: bold; margin-top: -3px; line-height: 1.2; }
 
-        .top-section { flex: 0 1 28%; min-height: 0; display: flex; gap: 1.5vw; }
-        .sys-chart-wrapper { flex: 1; border: 1px solid #333; padding: 1vh; background: #1a1a1a; border-radius: 8px; min-height: 200px; position: relative; }
-        .chart-wrapper { flex: 1.5; border: 1px solid #333; padding: 1vh; background: #1a1a1a; border-radius: 8px; min-height: 200px; position: relative; }
-        .sys-chart-wrapper canvas, .chart-wrapper canvas { width: 100% !important; height: 100% !important; }
+        .top-section { min-height: 0; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 1.5vw; overflow: hidden; }
+        .sys-chart-wrapper, .chart-wrapper { border: 1px solid #333; background: #1a1a1a; border-radius: 8px; min-width: 0; min-height: 0; height: 100%; position: relative; overflow: hidden; contain: layout paint; }
+        .sys-chart-wrapper canvas, .chart-wrapper canvas {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            bottom: 8px;
+            left: 8px;
+            display: block;
+            width: calc(100% - 16px) !important;
+            height: calc(100% - 16px) !important;
+            max-width: calc(100% - 16px) !important;
+            max-height: calc(100% - 16px) !important;
+        }
 
-        .table-wrapper { flex: 1 1 auto; min-height: 0; background: #1a1a1a; border-radius: 8px; padding: 1.5vh; border: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
+        .table-wrapper { min-height: 0; height: 100%; background: #1a1a1a; border-radius: 8px; padding: 1vh; border: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; position: relative; isolation: isolate; }
         table { width: 100%; border-collapse: collapse; text-align: center; font-size: 12px; font-size: clamp(11px, 0.9vw, 13px); color: #ccc; table-layout: fixed; }
         th, td { border: 1px solid #444; padding: 0.4vh 0.4vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -59,7 +76,7 @@
         .dot-red.is-editable { width: 14px; height: 14px; cursor: pointer; transition: transform .2s, box-shadow .2s; }
         .dot-red.is-editable:hover { transform: scale(1.2); box-shadow: 0 0 9px rgba(255,77,77,.9); }
 
-        .bottom-nav { flex: 0 0 auto; display: flex; justify-content: center; gap: 9px; padding-top: 5px; flex-wrap: wrap; }
+        .bottom-nav { min-height: 0; display: flex; justify-content: center; gap: 9px; padding-top: 3px; flex-wrap: nowrap; overflow: hidden; }
         .nav-btn { background-color: #2b4f73; color: #fff; border: 1px solid #5b9bd5; padding: 8px 20px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; text-decoration: none; transition: background 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
         .nav-btn:hover { background-color: #3b6fa5; }
         .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.78); z-index:1000; justify-content:center; align-items:center; }
@@ -83,6 +100,22 @@
             .d-day-title { letter-spacing: 1px; }
         }
 
+        /* 스마트 TV 브라우저의 확대 배율과 낮은 CSS 뷰포트에 맞춘 고정 화면 모드 */
+        @media screen and (max-height: 800px), screen and (max-width: 1400px) {
+            body {
+                grid-template-rows: 17vh 27vh minmax(0, 1fr) auto;
+                grid-template-rows: clamp(105px, 17vh, 145px) clamp(155px, 27vh, 225px) minmax(0, 1fr) auto;
+                padding: 1vh 1vw;
+                gap: 0.8vh;
+            }
+            .d-day-section { padding-top: 0.8vh; padding-bottom: 0.8vh; }
+            .d-day-title { margin-bottom: 0.6vh; font-size: clamp(17px, 1.8vw, 24px); }
+            .time-value { font-size: clamp(28px, 3.8vw, 54px); }
+            .time-label { font-size: clamp(11px, 1.1vw, 15px); }
+            .table-wrapper { padding: 0.7vh; }
+            .nav-btn { padding: 6px 14px; font-size: 12px; }
+        }
+
         /* --- A4 한 페이지 인쇄 최적화 스타일 --- */
         @media print {
             @page {
@@ -99,6 +132,8 @@
                 zoom: 88%;
             }
             body {
+                display: flex !important;
+                flex-direction: column !important;
                 padding: 0 !important;
                 gap: 5px !important;
             }
@@ -377,7 +412,7 @@
             let targetTimestamp = new Date('2026-11-01T00:00:00').getTime();
             async function initProjectConfig() {
                 try {
-                    const res = await fetch('/api/config');
+                    const res = await fetch('/api/config', { cache: 'no-store' });
                     const config = await res.json();
                     if (config.project_title) {
                         document.getElementById('dDayTitle').innerText = config.project_title + ' D-DAY';
@@ -424,7 +459,7 @@
                     { label: '실적', data: [], backgroundColor: '#ed7d31', datalabels: dataLabelConfig }
                 ]},
                 options: {
-                    responsive: true, maintainAspectRatio: false,
+                    responsive: true, maintainAspectRatio: false, animation: false, devicePixelRatio: 1, resizeDelay: 150,
                     layout: { padding: { top: 20 } },
                     scales: {
                         y: { min: 0, max: 100, ticks: { color: '#ccc', callback: v => v + '%' }, grid: { color: '#333' } },
@@ -463,7 +498,7 @@
                     }
                 ]},
                 options: {
-                    responsive: true, maintainAspectRatio: false,
+                    responsive: true, maintainAspectRatio: false, animation: false, devicePixelRatio: 1, resizeDelay: 150,
                     layout: { padding: { top: 15, bottom: 15 } },
                     scales: {
                         y: { min: 0, max: 100, ticks: { color: '#ccc', callback: v => v + '%' }, grid: { color: '#333' } },
@@ -476,8 +511,8 @@
             window.updateDashboard = async function() {
                 try {
                     const [resWeekly, resWbs] = await Promise.all([
-                        fetch('/api/weekly'),
-                        fetch('/api/wbs')
+                        fetch('/api/weekly', { cache: 'no-store' }),
+                        fetch('/api/wbs', { cache: 'no-store' })
                     ]);
                     const weekly = await resWeekly.json();
                     const state = await resWbs.json();

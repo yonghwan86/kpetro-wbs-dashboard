@@ -12,3 +12,7 @@ for (const entry of await readdir(root, { withFileTypes: true })) {
     await cp(path.join(root, entry.name), path.join(output, entry.name));
   }
 }
+
+// `/tv` is a stable, uncached entry point for wall displays. Keeping a separate
+// URL also bypasses HTML that older smart-TV browsers may have cached at `/`.
+await cp(path.join(output, 'index.html'), path.join(output, 'tv.html'));
