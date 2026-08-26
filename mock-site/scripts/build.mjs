@@ -1,4 +1,4 @@
-import { cp, mkdir, readdir, rm } from 'node:fs/promises';
+import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const root = process.cwd();
@@ -13,6 +13,11 @@ for (const entry of await readdir(root, { withFileTypes: true })) {
   }
 }
 
-// `/tv` is a stable, uncached entry point for wall displays. Keeping a separate
-// URL also bypasses HTML that older smart-TV browsers may have cached at `/`.
-await cp(path.join(output, 'index.html'), path.join(output, 'tv.html'));
+// `/tv` is a stable, uncached and navigation-free entry point for wall displays.
+// Keeping a separate URL also bypasses HTML older TVs may have cached at `/`.
+const dashboardHtml = await readFile(path.join(output, 'index.html'), 'utf8');
+await writeFile(
+  path.join(output, 'tv.html'),
+  dashboardHtml.replace('<body>', '<body class="tv-display">'),
+  'utf8'
+);

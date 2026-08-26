@@ -79,6 +79,8 @@
         .bottom-nav { min-height: 0; display: flex; justify-content: center; gap: 9px; padding-top: 3px; flex-wrap: nowrap; overflow: hidden; }
         .nav-btn { background-color: #2b4f73; color: #fff; border: 1px solid #5b9bd5; padding: 8px 20px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; text-decoration: none; transition: background 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
         .nav-btn:hover { background-color: #3b6fa5; }
+        body.tv-display { grid-template-rows: clamp(120px, 17vh, 190px) clamp(170px, 27vh, 305px) minmax(0, 1fr); }
+        body.tv-display .bottom-nav { display: none; }
         .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.78); z-index:1000; justify-content:center; align-items:center; }
         .modal-box { width:min(520px,92vw); background:#1a1a1a; border:1px solid #444; border-radius:10px; padding:24px; box-shadow:0 8px 28px rgba(0,0,0,.8); }
         .modal-box h3 { margin-bottom:16px; color:#ff7777; font-size:18px; }
@@ -114,6 +116,7 @@
             .time-label { font-size: clamp(11px, 1.1vw, 15px); }
             .table-wrapper { padding: 0.7vh; }
             .nav-btn { padding: 6px 14px; font-size: 12px; }
+            body.tv-display { grid-template-rows: clamp(105px, 17vh, 145px) clamp(155px, 27vh, 225px) minmax(0, 1fr); }
         }
 
         /* --- A4 한 페이지 인쇄 최적화 스타일 --- */
@@ -151,7 +154,7 @@
         }
     </style>
 </head>
-<body>
+<body class="tv-display">
 
     <div class="d-day-section">
         <div class="brand-area">

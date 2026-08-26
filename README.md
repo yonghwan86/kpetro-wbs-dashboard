@@ -79,7 +79,7 @@ npx --yes vercel@latest --prod
 - GitHub 저장소: <https://github.com/yonghwan86/kpetro-wbs-dashboard>
 - Vercel 계정 `yonghwan86s-projects`에 접근 권한이 있어야 기존 프로젝트로 배포할 수 있습니다.
 
-TV에는 `/tv` 주소를 사용합니다. 이 경로는 HTML 캐시를 금지하며, 화면은 매시간 새로고침되고 D-DAY 시계는 브라우저 안에서 매초 갱신됩니다.
+TV에는 `/tv` 주소를 사용합니다. 이 경로는 HTML 캐시를 금지하고 하단 관리 메뉴를 숨깁니다. 화면은 매시간 새로고침되고 D-DAY 시계는 브라우저 안에서 매초 갱신됩니다.
 
 ## 주요 폴더
 
