@@ -1,23 +1,26 @@
-# WBS 1단계 화면 목업
+# KPetro WBS Dashboard
 
-기존 Flask 원본을 수정하지 않고 화면 검토를 위해 분리한 정적 사이트입니다.
+Vercel에 배포되는 실제 운영 애플리케이션입니다.
 
-## 범위
+- 공개 대시보드: 로그인 없이 조회, 1시간마다 공용 데이터 갱신
+- 관리 화면: 로그인 및 화면별 권한 적용
+- 데이터: Neon PostgreSQL에 저장되어 PC와 TV가 동일한 내용 조회
+- 회의 첨부: Vercel Private Blob에 최대 20MB로 저장
+- WBS 엑셀: 표준 양식 다운로드, 업로드 검증/미리보기 후 전체 반영
 
-- 대시보드, 단계별 입력, 주차별 입력, 회의 관리, 프로젝트 설정 화면
-- 로그인, 회원 관리, 공통 코드 관리, 지연 사유·만회 계획 입력 흐름
-- 샘플 데이터만 포함
-- 입력 데이터는 각 브라우저의 `localStorage`에만 임시 저장
-- 로그인은 `admin / mock1234`로 화면 이동만 확인하며 실제 인증이 아님
-- 실제 DB, 서버 업로드, 엑셀 내용 반영은 포함하지 않음
-- 샘플 첨부파일 다운로드만 제공
+## WBS 엑셀 형식
 
-## 로컬 확인
+`.xlsx` 파일만 지원하며 최대 4MB입니다. `WBS` 시트에는 `시스템명`, `단계명`, `가중치`, `계획진척률`, `실제진척률`, `시작일`, `종료일`, `기준일` 열을 사용합니다. `지연사유`, `만회대책`은 선택입니다. 선택 시트인 `주차별`에는 `주차`, `계획진척률`, `실제진척률` 열을 사용합니다. 관리 화면의 `엑셀 양식 받기`에서 동일한 형식의 파일을 내려받을 수 있습니다.
 
-정적 파일 서버로 이 폴더를 서비스한 뒤 `index.html`을 엽니다.
+## 필수 Vercel 환경변수
 
-## Vercel 배포
+- `DATABASE_URL`
+- `BLOB_READ_WRITE_TOKEN`
+- `SESSION_SECRET` (32자 이상)
+- `INITIAL_ADMIN_ID`
+- `INITIAL_ADMIN_PASSWORD`
+- `INITIAL_ADMIN_EMAIL` (선택)
 
-Vercel 프로젝트의 Root Directory를 `mock-site`로 지정합니다. Framework Preset은 `Other`, Build Command와 Output Directory는 비워 둡니다.
+Vercel 프로젝트의 Root Directory는 `mock-site`로 유지합니다. 로컬 개발은 이 디렉터리에서 `npm install` 후 `vercel dev`를 실행합니다. 수동 배포 명령은 저장소 루트에서 실행해야 Root Directory가 중복 적용되지 않습니다.
 
-이 목업은 실제 업무자료를 저장하면 안 됩니다. 기능형 2단계 사이트는 별도의 인증, 외부 DB, 객체 저장소를 사용합니다.
+`public/`은 Vercel 정적 배포용 산출물입니다. 원본 HTML과 `assets/`를 수정한 뒤 `npm run build`로 갱신하며, `public/` 파일을 직접 편집하지 않습니다.

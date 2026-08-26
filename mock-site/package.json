@@ -1,0 +1,27 @@
+{
+  "name": "kpetro-wbs-dashboard",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild client/blob-upload.js --bundle --minify --format=iife --global-name=KpetroBlob --outfile=assets/blob-upload.js && node scripts/build.mjs",
+    "vercel-build": "npm run build",
+    "test": "node --test tests/*.test.js",
+    "smoke:production": "node scripts/smoke-production.mjs"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.3.0",
+    "exceljs": "^4.4.0",
+    "formidable": "^3.5.4",
+    "postgres": "^3.4.7"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.9"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}

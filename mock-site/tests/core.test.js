@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import test from 'node:test';
+import { makeWbsTemplate, parseWbsWorkbook } from '../api/_lib/excel.js';
+import { createSessionToken, hashPassword, verifyPassword, verifySessionToken } from '../api/_lib/security.js';
+
+test('password hashing and signed session token', () => {
+  process.env.SESSION_SECRET = 'test-session-secret-that-is-longer-than-thirty-two-characters';
+  const hash = hashPassword('Example!1234');
+  assert.equal(verifyPassword(hash, 'Example!1234'), true);
+  assert.equal(verifyPassword(hash, 'wrong-password'), false);
+  const token = createSessionToken({ id: 'tester' });
+  assert.equal(verifySessionToken(token).sub, 'tester');
+  assert.equal(verifySessionToken(`${token}broken`), null);
+});
+
+test('generated WBS workbook can be parsed', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'kpetro-wbs-'));
+  const filePath = path.join(directory, 'template.xlsx');
+  try {
+    await fs.writeFile(filePath, await makeWbsTemplate());
+    const parsed = await parseWbsWorkbook(filePath);
+    assert.equal(parsed.wbs.length, 1);
+    assert.equal(parsed.weekly.length, 2);
+    assert.equal(parsed.wbs[0].system_name, '1. 수급가격통합시스템');
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
