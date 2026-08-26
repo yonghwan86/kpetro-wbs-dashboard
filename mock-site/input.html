@@ -42,6 +42,11 @@
         input:focus { border-color: #5b9bd5; outline: none; }
 
         .sort-icon { font-size: 11px; margin-left: 5px; color: #8faecf; }
+        #wbsTable th:last-child, #wbsTable td:last-child { width: 128px; min-width: 128px; }
+        .row-actions { display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+        .row-actions .btn { flex: 0 0 auto; padding: 5px 7px; font-size: 11px; line-height: 1.2; white-space: nowrap; }
+        .row-save-btn { min-width: 62px; }
+        .row-delete-btn { min-width: 38px; }
     </style>
 </head>
 <body>
@@ -163,9 +168,9 @@
                     <td><input type="date" value="${escapeAttribute(row.start_date)}" id="start_${index}"></td>
                     <td><input type="date" value="${escapeAttribute(row.end_date)}" id="end_${index}"></td>
                     <td>
-                        <div style="display: flex; gap: 5px; justify-content: center;">
-                            <button class="btn btn-primary" style="padding: 4px 8px; font-size: 11px;" onclick="saveRow(${index})">개별저장</button>
-                            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="deleteRow(${index})">삭제</button>
+                        <div class="row-actions">
+                            <button class="btn btn-primary row-save-btn" onclick="saveRow(${index})">개별저장</button>
+                            <button class="btn btn-danger row-delete-btn" onclick="deleteRow(${index})">삭제</button>
                         </div>
                     </td>
                 `;
