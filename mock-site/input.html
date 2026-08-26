@@ -29,8 +29,9 @@
         .btn-secondary { background-color: #444; color: #fff; text-decoration: none; display: inline-flex; align-items: center; }
         .btn-secondary:hover { background-color: #555; }
 
-        .table-wrapper { max-height: 65vh; overflow-y: auto; border: 1px solid #444; border-radius: 6px; margin-bottom: 20px; }
+        .table-wrapper { max-height: 65vh; overflow: auto; border: 1px solid #444; border-radius: 6px; margin-bottom: 20px; }
         table { width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; }
+        #wbsTable { min-width: 1180px; }
         th, td { border: 1px solid #444; padding: 8px 10px; }
         th { background-color: #262626; color: #ddd; position: sticky; top: 0; z-index: 10; cursor: pointer; user-select: none; }
         th:hover { background-color: #333; }
@@ -48,23 +49,27 @@
         .row-save-btn { min-width: 62px; }
         .row-delete-btn { min-width: 38px; }
     </style>
+    <link rel="stylesheet" href="/assets/management-shell.css">
 </head>
 <body>
 
     <div class="container">
-        <div class="header-bar">
-            <div>
-                <h1>WBS 항목 및 일정 관리</h1>
-                <div style="margin-top:5px;color:#999;font-size:11px;">수동 입력과 엑셀 반영 결과는 모든 PC·TV에 공통 적용됩니다.</div>
+        <header class="management-header">
+            <div class="management-heading">
+                <a class="management-dashboard-link" href="/" aria-label="대시보드로 돌아가기">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-7h5v7"></path></svg>
+                    대시보드
+                </a>
+                <h1 class="management-title">WBS 항목 및 일정 관리</h1>
+                <p class="management-description">단계별 가중치·진척률·일정을 입력하며 저장 결과는 모든 PC와 TV에 반영됩니다.</p>
             </div>
-            <div class="btn-group">
-                <a class="btn btn-secondary" href="/api/wbs/template">엑셀 양식 받기</a>
-                <label class="btn btn-primary" style="cursor:pointer;">엑셀 불러오기<input id="wbsExcelFile" type="file" accept=".xlsx" hidden></label>
-                <button class="btn btn-secondary" onclick="location.href='/'">대시보드로 가기</button>
-                <button class="btn btn-primary" onclick="addRow()">+ 항목 추가</button>
-                <button class="btn btn-success" onclick="saveAll()">전체 저장 및 반영</button>
+            <div class="management-actions">
+                <a class="btn btn-secondary" href="/api/wbs/template" title="WBS 엑셀 입력 양식을 내려받습니다.">엑셀 양식</a>
+                <label class="btn btn-primary" style="cursor:pointer;" title="작성한 WBS 엑셀 파일을 검증하고 반영합니다.">엑셀 불러오기<input id="wbsExcelFile" type="file" accept=".xlsx" hidden></label>
+                <button class="btn btn-primary" onclick="addRow()" title="새 WBS 입력 행을 추가합니다.">+ 항목 추가</button>
+                <button class="btn btn-success" onclick="saveAll()" title="화면의 모든 WBS 변경사항을 저장합니다.">전체 저장</button>
             </div>
-        </div>
+        </header>
 
         <div class="table-wrapper">
             <table id="wbsTable">

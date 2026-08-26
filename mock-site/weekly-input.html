@@ -29,16 +29,23 @@
         td { background-color: #1a1a1a; }
         input[type="number"] { width: 100%; background: #262626; border: 1px solid #555; color: #fff; padding: 5px; border-radius: 4px; text-align: center; font-size: 13px; }
     </style>
+    <link rel="stylesheet" href="/assets/management-shell.css">
 </head>
 <body>
     <div class="container">
-        <div class="header-bar">
-            <h1>진척관리(주차별)</h1>
-            <div class="btn-group">
-                <button class="btn btn-secondary" onclick="location.href='/'">대시보드로 가기</button>
-                <button class="btn btn-success" onclick="saveAll()">전체 저장 및 반영</button>
+        <header class="management-header">
+            <div class="management-heading">
+                <a class="management-dashboard-link" href="/" aria-label="대시보드로 돌아가기">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-7h5v7"></path></svg>
+                    대시보드
+                </a>
+                <h1 class="management-title">주차별 진척 관리</h1>
+                <p class="management-description">프로젝트 기간에 맞춰 주차별 계획과 실제 진척률을 일괄 관리합니다.</p>
             </div>
-        </div>
+            <div class="management-actions">
+                <button class="btn btn-success" onclick="saveAll()" title="모든 주차의 계획·실적을 저장합니다.">전체 저장</button>
+            </div>
+        </header>
 
         <div class="table-wrapper">
             <table>

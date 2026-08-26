@@ -49,17 +49,29 @@
         .form-group textarea { resize: vertical; height: 60px; }
         .form-row { display: flex; gap: 10px; }
         .form-row .form-group { flex: 1; }
+        @media (max-width: 1000px) {
+            .search-bar { flex-wrap: wrap; }
+            .layout-grid { grid-template-columns: 1fr; }
+            .panel { max-height: none; }
+        }
     </style>
+    <link rel="stylesheet" href="/assets/management-shell.css">
 </head>
 <body>
     <div class="container">
-        <div class="header-bar">
-            <h1>회의 관리 시스템</h1>
-            <div class="btn-group">
-                <button class="btn btn-secondary" onclick="location.href='/'">대시보드로 가기</button>
-                <button class="btn btn-primary" onclick="resetForm()">+ 새 회의 등록</button>
+        <header class="management-header">
+            <div class="management-heading">
+                <a class="management-dashboard-link" href="/" aria-label="대시보드로 돌아가기">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-7h5v7"></path></svg>
+                    대시보드
+                </a>
+                <h1 class="management-title">회의 관리</h1>
+                <p class="management-description">회의 일정·내용·요약과 첨부파일을 한곳에서 기록하고 조회합니다.</p>
             </div>
-        </div>
+            <div class="management-actions">
+                <button class="btn btn-primary" onclick="resetForm()" title="입력 양식을 초기화하고 새 회의를 등록합니다.">+ 새 회의</button>
+            </div>
+        </header>
 
         <!-- 일자별 조회 바 -->
         <div class="search-bar">

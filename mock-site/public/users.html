@@ -9,11 +9,25 @@
         button,.btn{display:inline-flex;align-items:center;justify-content:center;padding:8px 13px;border:1px solid #5b9bd5;border-radius:6px;background:#2b4f73;color:#fff;font-weight:bold;text-decoration:none;cursor:pointer}.secondary{background:#444;border-color:#666}.success{background:#2e7d32;border-color:#4caf50}.danger{background:#8b1111;border-color:#d64a4a}.grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(330px,.7fr);gap:14px}.panel{background:#1a1a1a;border:1px solid #333;border-radius:9px;padding:16px;min-width:0}.table-wrap{overflow:auto;max-height:68vh}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:8px;border:1px solid #444;white-space:nowrap;text-align:center}th{position:sticky;top:0;background:#282828;color:#ddd}.admin{color:#e4cd79}
         .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.full{grid-column:1/-1}label{display:block;margin-bottom:4px;color:#aaa;font-size:11px;font-weight:bold}input,select{width:100%;padding:8px;background:#272727;color:#fff;border:1px solid #555;border-radius:5px}.permissions{display:grid;grid-template-columns:1fr 1fr;gap:7px}.perm{display:flex;align-items:center;justify-content:space-between;padding:7px;background:#242424;border-radius:5px;font-size:12px}.perm input{width:auto}.actions{display:flex;gap:7px;justify-content:flex-end;margin-top:14px}.excel{display:flex;align-items:center;gap:8px;font-size:12px}.excel input{width:auto}.hint{margin-top:10px;color:#999;font-size:11px;line-height:1.5}@media(max-width:1050px){.grid{grid-template-columns:1fr}.table-wrap{max-height:45vh}}
     </style>
+    <link rel="stylesheet" href="/assets/management-shell.css">
 </head>
 <body>
 <main class="container">
-    <div class="head"><div><h1>회원 관리</h1><div class="tag">계정과 화면별 접근권한을 관리합니다.</div></div><div><a class="btn secondary" href="/codes.html">공통 코드</a> <a class="btn" href="/">대시보드</a></div></div>
-    <div class="toolbar"><button id="newButton">+ 신규 회원</button><div class="excel"><span>회원 엑셀 등록:</span><input id="excelFile" type="file" accept=".xlsx"><button class="success" id="excelButton">엑셀 반영</button></div></div>
+    <header class="management-header">
+        <div class="management-heading">
+            <a class="management-dashboard-link" href="/" aria-label="대시보드로 돌아가기">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-7h5v7"></path></svg>
+                대시보드
+            </a>
+            <h1 class="management-title">회원 관리</h1>
+            <p class="management-description">승인 계정과 관리 화면별 접근 권한을 등록하고 변경합니다.</p>
+        </div>
+        <div class="management-actions">
+            <a class="btn secondary" href="/codes.html" title="회원 등록에 사용하는 팀명·직무 코드를 관리합니다.">공통 코드 관리</a>
+            <button id="newButton" title="신규 회원 입력 양식을 엽니다.">+ 신규 회원</button>
+        </div>
+    </header>
+    <div class="toolbar"><div class="excel"><span>회원 엑셀 등록</span><input id="excelFile" type="file" accept=".xlsx"><button class="success" id="excelButton">엑셀 반영</button></div></div>
     <div class="grid">
         <section class="panel table-wrap"><table><thead><tr><th>아이디</th><th>성명</th><th>소속</th><th>팀명</th><th>직무</th><th>이메일</th><th>기간</th><th>권한</th><th>관리</th></tr></thead><tbody id="userRows"></tbody></table></section>
         <section class="panel"><h2 id="formTitle" style="font-size:17px;margin:0 0 14px">신규 회원 등록</h2>
