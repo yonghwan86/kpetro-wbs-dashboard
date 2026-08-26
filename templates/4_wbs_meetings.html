@@ -120,8 +120,8 @@
                     <textarea id="agenda" placeholder="주요 안건 내용"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>비밀번호 (변경/삭제 시 필요) *</label>
-                    <input type="password" id="password" placeholder="비밀번호 4자리 이상">
+                    <label>비밀번호 (신규 등록 시 필수, 수정 시 비워두면 기존 값 유지) *</label>
+                    <input type="password" id="password" minlength="4" autocomplete="new-password" placeholder="비밀번호 4자리 이상">
                 </div>
                 <div class="form-group">
                     <label>회의내용</label>
@@ -135,7 +135,7 @@
                 <!-- 복수 파일 첨부 및 다운로드 영역 -->
                 <div class="form-group">
                     <label>첨부파일 (복수 선택 가능)</label>
-                    <input type="file" id="meetingFile" multiple style="padding: 3px;" onchange="previewFiles()">
+                    <input type="file" id="meetingFile" multiple accept=".pdf,.doc,.docx,.hwp,.hwpx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg" style="padding: 3px;" onchange="previewFiles()">
                     <div id="fileDownloadArea" style="margin-top: 6px; font-size: 12px; color: #aaa;">첨부된 파일 없음</div>
                 </div>
 
@@ -182,11 +182,14 @@
                     tr.onclick = () => selectMeeting(m);
                     const formattedTime = formatTimeStr(m.meeting_time);
                     const hasFiles = m.files && m.files.length > 0;
-                    tr.innerHTML = `
-                        <td>${m.meeting_date} ${formattedTime}</td>
-                        <td style="text-align: left; padding-left: 10px; font-weight: bold;">${m.title} ${hasFiles ? '📎' : ''}</td>
-                        <td>${m.location || '-'}</td>
-                    `;
+                    const dateCell = document.createElement('td');
+                    dateCell.textContent = `${m.meeting_date} ${formattedTime}`;
+                    const titleCell = document.createElement('td');
+                    titleCell.style.cssText = 'text-align:left;padding-left:10px;font-weight:bold;';
+                    titleCell.textContent = `${m.title}${hasFiles ? ' 📎' : ''}`;
+                    const locationCell = document.createElement('td');
+                    locationCell.textContent = m.location || '-';
+                    tr.append(dateCell, titleCell, locationCell);
                     tbody.appendChild(tr);
                 });
             } catch (e) {
@@ -209,34 +212,46 @@
             const fileArea = document.getElementById('fileDownloadArea');
             const fileInput = document.getElementById('meetingFile');
 
-            let html = '';
-
-            // 1. 기존 업로드된 파일 목록 표시
+            fileArea.replaceChildren();
             if (currentMeetingFiles && currentMeetingFiles.length > 0) {
-                html += '기존 첨부파일 목록:<ul style="margin-top: 4px; padding-left: 15px; margin-bottom: 8px;">';
+                fileArea.append(document.createTextNode('기존 첨부파일 목록:'));
+                const list = document.createElement('ul');
+                list.style.cssText = 'margin-top:4px;padding-left:15px;margin-bottom:8px;';
                 currentMeetingFiles.forEach(f => {
-                    html += `<li style="margin-bottom: 3px;">
-                        <a href="/api/meeting-files/${f.id}/download" style="color: #5b9bd5; text-decoration: underline;" target="_blank">${f.file_name}</a>
-                        <button type="button" onclick="deleteFile(${f.id})" style="background: #990000; color: #fff; border: none; padding: 1px 5px; border-radius: 3px; font-size: 10px; cursor: pointer; margin-left: 8px;">삭제</button>
-                    </li>`;
+                    const item = document.createElement('li');
+                    item.style.marginBottom = '3px';
+                    const link = document.createElement('a');
+                    link.href = `/api/meeting-files/${encodeURIComponent(f.id)}/download`;
+                    link.target = '_blank';
+                    link.rel = 'noopener';
+                    link.style.cssText = 'color:#5b9bd5;text-decoration:underline;';
+                    link.textContent = f.file_name;
+                    const removeButton = document.createElement('button');
+                    removeButton.type = 'button';
+                    removeButton.textContent = '삭제';
+                    removeButton.style.cssText = 'background:#990000;color:#fff;border:none;padding:1px 5px;border-radius:3px;font-size:10px;cursor:pointer;margin-left:8px;';
+                    removeButton.addEventListener('click', () => deleteFile(f.id));
+                    item.append(link, removeButton);
+                    list.appendChild(item);
                 });
-                html += '</ul>';
+                fileArea.appendChild(list);
             }
 
-            // 2. 새로 선택한 파일 목록 미리보기 표시
             if (fileInput.files && fileInput.files.length > 0) {
-                html += '새로 선택한 파일 (저장 시 추가됨):<ul style="margin-top: 4px; padding-left: 15px; color: #4ade80;">';
-                for (let i = 0; i < fileInput.files.length; i++) {
-                    html += `<li>${fileInput.files[i].name}</li>`;
-                }
-                html += '</ul>';
+                fileArea.append(document.createTextNode('새로 선택한 파일 (저장 시 추가됨):'));
+                const selectedList = document.createElement('ul');
+                selectedList.style.cssText = 'margin-top:4px;padding-left:15px;color:#4ade80;';
+                Array.from(fileInput.files).forEach(file => {
+                    const item = document.createElement('li');
+                    item.textContent = file.name;
+                    selectedList.appendChild(item);
+                });
+                fileArea.appendChild(selectedList);
             }
 
             if (!currentMeetingFiles.length && (!fileInput.files || fileInput.files.length === 0)) {
-                html = '첨부된 파일 없음';
+                fileArea.textContent = '첨부된 파일 없음';
             }
-
-            fileArea.innerHTML = html;
         }
 
         function previewFiles() {
@@ -254,7 +269,7 @@
             document.getElementById('location').value = m.location || '';
             document.getElementById('attendees').value = m.attendees || '';
             document.getElementById('agenda').value = m.agenda || '';
-            document.getElementById('password').value = m.password || '';
+            document.getElementById('password').value = '';
             document.getElementById('content').value = m.content || '';
             document.getElementById('summary').value = m.summary || '';
             document.getElementById('others').value = m.others || '';
@@ -328,8 +343,8 @@
                 formData.append('file', fileInput.files[i]);
             }
 
-            if (!formData.get('title') || !formData.get('meeting_date') || !formData.get('meeting_time') || !formData.get('password')) {
-                alert("회의제목, 일자, 시간, 비밀번호는 필수 입력 항목입니다.");
+            if (!formData.get('title') || !formData.get('meeting_date') || !formData.get('meeting_time') || (!selectedMeetingId && !formData.get('password'))) {
+                alert("회의제목, 일자, 시간은 필수이며 신규 등록 시 비밀번호도 입력해야 합니다.");
                 return;
             }
 

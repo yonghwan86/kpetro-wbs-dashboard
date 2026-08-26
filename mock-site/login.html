@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>로그인 화면 목업</title>
+    <link rel="icon" href="/assets/kpetro-app-icon.png" type="image/png">
+    <script src="/assets/mock-api.js"></script>
+    <style>
+        *{box-sizing:border-box} body{margin:0;min-height:100vh;display:grid;place-items:center;background:#121212;color:#e5e5e5;font-family:'Malgun Gothic',sans-serif}
+        .card{width:min(390px,92vw);padding:30px;background:#1a1a1a;border:1px solid #343434;border-radius:12px;box-shadow:0 12px 35px rgba(0,0,0,.55)}
+        .brand{display:block;width:210px;height:62px;object-fit:contain;margin:0 auto 18px}.notice{padding:10px 12px;margin-bottom:20px;border:1px solid #806c2c;border-radius:6px;background:#292514;color:#e4cd79;font-size:12px;line-height:1.55}
+        h1{text-align:center;font-size:21px;margin:0 0 22px}label{display:block;margin:13px 0 6px;color:#aaa;font-size:12px;font-weight:bold}input{width:100%;padding:11px;background:#272727;color:#fff;border:1px solid #555;border-radius:6px;font-size:14px}input:focus{outline:none;border-color:#5b9bd5}
+        button,.link{width:100%;display:block;margin-top:16px;padding:11px;border-radius:6px;border:1px solid #5b9bd5;background:#2b4f73;color:#fff;font-weight:bold;text-align:center;text-decoration:none;cursor:pointer}.link{margin-top:9px;background:#333;border-color:#555}.help{margin-top:16px;text-align:center;color:#8faecf;font-size:12px;cursor:pointer}
+    </style>
+</head>
+<body>
+    <main class="card">
+        <img src="/assets/kpetro-ci.png" class="brand" alt="KPetro">
+        <div class="notice"><strong>화면 검토용 로그인 목업</strong><br>실제 인증이나 사용자 정보는 전송되지 않습니다.<br>테스트 계정: admin / mock1234</div>
+        <h1>WBS 및 회의 관리 시스템</h1>
+        <label for="loginId">아이디</label>
+        <input id="loginId" value="admin" autocomplete="username">
+        <label for="loginPw">비밀번호</label>
+        <input id="loginPw" type="password" value="mock1234" autocomplete="current-password">
+        <button type="button" id="loginButton">로그인</button>
+        <div class="help" id="forgotButton">비밀번호 초기화 안내</div>
+        <a class="link" href="/">공개 대시보드로 돌아가기</a>
+    </main>
+    <script>
+        async function login(){
+            const response=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:document.getElementById('loginId').value.trim(),password:document.getElementById('loginPw').value})});
+            const result=await response.json();
+            if(response.ok&&result.success) location.href='/users.html';
+            else alert(result.message||'로그인하지 못했습니다.');
+        }
+        document.getElementById('loginButton').addEventListener('click',login);
+        document.getElementById('loginPw').addEventListener('keydown',event=>{if(event.key==='Enter')login();});
+        document.getElementById('forgotButton').addEventListener('click',()=>alert('실제 서비스에서는 관리자가 임시 비밀번호를 발급하고, 최초 로그인 시 사용자가 변경합니다.'));
+    </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive">
+    <title>공통 코드 관리 화면 목업</title><link rel="icon" href="/assets/kpetro-app-icon.png" type="image/png"><script src="/assets/mock-api.js"></script>
+    <style>
+        *{box-sizing:border-box}body{margin:0;padding:20px;background:#121212;color:#e5e5e5;font-family:'Malgun Gothic',sans-serif}.container{max-width:1120px;margin:auto}.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}h1{margin:0;font-size:23px}.tag{color:#e4cd79;font-size:12px}.grid{display:grid;grid-template-columns:1.4fr .75fr;gap:14px}.panel{background:#1a1a1a;border:1px solid #333;border-radius:9px;padding:16px}.table-wrap{max-height:72vh;overflow:auto}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px;border:1px solid #444;text-align:center}th{position:sticky;top:0;background:#282828}.btn,button{display:inline-flex;padding:8px 13px;border:1px solid #5b9bd5;border-radius:6px;background:#2b4f73;color:#fff;font-weight:bold;text-decoration:none;cursor:pointer}.secondary{background:#444;border-color:#666}.success{background:#2e7d32;border-color:#4caf50}.danger{background:#8b1111;border-color:#d64a4a}label{display:block;margin:11px 0 5px;color:#aaa;font-size:11px;font-weight:bold}input{width:100%;padding:9px;background:#272727;color:#fff;border:1px solid #555;border-radius:5px}.actions{display:flex;gap:7px;justify-content:flex-end;margin-top:16px}@media(max-width:850px){.grid{grid-template-columns:1fr}}
+    </style>
+</head>
+<body>
+<main class="container">
+    <div class="head"><div><h1>공통 코드 관리</h1><div class="tag">팀명·직무 등의 선택항목을 관리하는 화면 목업</div></div><div><a class="btn secondary" href="/users.html">회원 관리</a> <a class="btn" href="/">대시보드</a></div></div>
+    <div class="grid">
+        <section class="panel table-wrap"><table><thead><tr><th>분류코드</th><th>분류명</th><th>코드값</th><th>코드명</th><th>순서</th><th>관리</th></tr></thead><tbody id="codeRows"></tbody></table></section>
+        <section class="panel"><h2 id="formTitle" style="font-size:17px;margin:0 0 12px">신규 코드 등록</h2><input id="codeId" type="hidden">
+            <label for="categoryCode">분류코드</label><input id="categoryCode" placeholder="예: TEAM">
+            <label for="categoryName">분류명</label><input id="categoryName" placeholder="예: 팀명">
+            <label for="codeValue">코드값</label><input id="codeValue" placeholder="예: DEV">
+            <label for="codeName">코드명</label><input id="codeName" placeholder="예: 개발팀">
+            <label for="sortOrder">정렬 순서</label><input id="sortOrder" type="number" value="1">
+            <div class="actions"><button class="secondary" id="clearButton">초기화</button><button class="success" id="saveButton">저장</button></div>
+        </section>
+    </div>
+</main>
+<script>
+    function cell(row,value){const td=document.createElement('td');td.textContent=value??'';row.appendChild(td);return td;}
+    async function loadCodes(){const response=await fetch('/api/codes');const codes=await response.json();const rows=document.getElementById('codeRows');rows.innerHTML='';codes.forEach(code=>{const row=document.createElement('tr');[code.category_code,code.category_code_name,code.code_value,code.code_name,code.sort_order].forEach(value=>cell(row,value));const actions=cell(row,'');const edit=document.createElement('button');edit.textContent='수정';edit.addEventListener('click',()=>editCode(code));const remove=document.createElement('button');remove.textContent='삭제';remove.className='danger';remove.style.marginLeft='5px';remove.addEventListener('click',()=>deleteCode(code.id));actions.append(edit,remove);rows.appendChild(row);});}
+    function clearForm(){document.getElementById('formTitle').textContent='신규 코드 등록';document.getElementById('codeId').value='';document.getElementById('categoryCode').value='TEAM';document.getElementById('categoryName').value='팀명';document.getElementById('codeValue').value='';document.getElementById('codeName').value='';document.getElementById('sortOrder').value='1';}
+    function editCode(code){document.getElementById('formTitle').textContent='코드 정보 수정';document.getElementById('codeId').value=code.id;document.getElementById('categoryCode').value=code.category_code;document.getElementById('categoryName').value=code.category_code_name||'';document.getElementById('codeValue').value=code.code_value;document.getElementById('codeName').value=code.code_name;document.getElementById('sortOrder').value=code.sort_order;}
+    async function saveCode(){const payload={id:document.getElementById('codeId').value||null,category_code:document.getElementById('categoryCode').value.trim(),category_code_name:document.getElementById('categoryName').value.trim(),code_value:document.getElementById('codeValue').value.trim(),code_name:document.getElementById('codeName').value.trim(),sort_order:Number(document.getElementById('sortOrder').value)||0};if(!payload.category_code||!payload.code_value||!payload.code_name){alert('분류코드, 코드값, 코드명을 입력해주세요.');return;}const response=await fetch('/api/codes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const result=await response.json();if(!response.ok){alert(result.message||'저장 실패');return;}clearForm();loadCodes();}
+    async function deleteCode(id){if(!confirm('이 코드를 삭제하시겠습니까?'))return;await fetch('/api/codes',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});loadCodes();}
+    document.getElementById('clearButton').addEventListener('click',clearForm);document.getElementById('saveButton').addEventListener('click',saveCode);clearForm();loadCodes();
+</script>
+</body>
+</html>

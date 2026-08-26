@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 - WBS 및 회의 관리 시스템</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .login-card { background: #1a1a1a; padding: 30px; border-radius: 10px; border: 1px solid #333; width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.8); }
+        h2 { text-align: center; margin-bottom: 25px; color: #fff; font-size: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 12px; color: #aaa; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; background: #262626; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 5px; font-size: 14px; }
+        input:focus { border-color: #5b9bd5; outline: none; }
+        .btn { width: 100%; padding: 10px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px; margin-top: 10px; transition: background 0.2s; }
+        .btn-primary { background-color: #2b4f73; color: #fff; border: 1px solid #5b9bd5; }
+        .btn-primary:hover { background-color: #3b6fa5; }
+        .links { display: flex; justify-content: space-between; margin-top: 15px; font-size: 12px; }
+        .links a { color: #8faecf; text-decoration: none; cursor: pointer; }
+        .links a:hover { text-decoration: underline; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; }
+        .modal-content { background: #1a1a1a; padding: 25px; border-radius: 8px; width: 350px; border: 1px solid #444; }
+    </style>
+</head>
+<body>
+
+    <div class="login-card" id="loginBox">
+        <h2>시스템 로그인</h2>
+        <div class="form-group">
+            <label>아이디</label>
+            <input type="text" id="loginId" maxlength="50" autocomplete="username" placeholder="아이디 입력">
+        </div>
+        <div class="form-group">
+            <label>비밀번호</label>
+            <input type="password" id="loginPw" autocomplete="current-password" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter') doLogin()">
+        </div>
+        <button class="btn btn-primary" onclick="doLogin()">로그인</button>
+        <div class="links">
+            <a onclick="openForgotModal()">비밀번호 찾기 / 초기화</a>
+        </div>
+    </div>
+
+    <!-- 첫 로그인 비밀번호 변경 카드 -->
+    <div class="login-card" id="firstLoginBox" style="display: none;">
+        <h2>최초 로그인 비밀번호 변경</h2>
+        <p style="font-size: 12px; color: #aaa; margin-bottom: 15px; text-align: center;">초기 비밀번호로 로그인하셨습니다.<br>새로운 비밀번호를 등록해 주세요.</p>
+        <div class="form-group">
+            <label>새 비밀번호</label>
+            <input type="password" id="newPw" minlength="8" autocomplete="new-password" placeholder="8자 이상 입력">
+        </div>
+        <div class="form-group">
+            <label>새 비밀번호 확인</label>
+            <input type="password" id="newPwConfirm" minlength="8" autocomplete="new-password" placeholder="비밀번호 재입력" onkeydown="if(event.key==='Enter') saveFirstPassword()">
+        </div>
+        <button class="btn btn-primary" onclick="saveFirstPassword()">비밀번호 등록 및 시작</button>
+    </div>
+
+    <!-- 비밀번호 찾기 모달 -->
+    <div id="forgotModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 15px; font-size: 16px; color: #fff;">비밀번호 초기화</h3>
+            <div class="form-group">
+                <label>아이디</label>
+                <input type="text" id="forgotId" maxlength="50" placeholder="아이디 입력">
+            </div>
+            <div class="form-group">
+                <label>등록된 이메일</label>
+                <input type="text" id="forgotEmail" placeholder="이메일 입력">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="btn" style="background: #444; color: #fff;" onclick="closeForgotModal()">취소</button>
+                <button class="btn btn-primary" onclick="doForgot()">초기화 요청</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function doLogin() {
+            const id = document.getElementById('loginId').value.trim();
+            const password = document.getElementById('loginPw').value;
+            if(!id || !password) { alert("아이디와 비밀번호를 입력해주세요."); return; }
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, password })
+                });
+                const result = await res.json();
+                if(res.ok && result.success) {
+                    if(result.is_first_login) {
+                        document.getElementById('loginBox').style.display = 'none';
+                        document.getElementById('firstLoginBox').style.display = 'block';
+                    } else {
+                        location.href = '/';
+                    }
+                } else {
+                    alert(result.message || "로그인 실패");
+                }
+            } catch(e) { alert("서버 통신 에러"); }
+        }
+
+        async function saveFirstPassword() {
+            const p1 = document.getElementById('newPw').value;
+            const p2 = document.getElementById('newPwConfirm').value;
+            if(p1.length < 8) { alert("새 비밀번호는 8자 이상이어야 합니다."); return; }
+            if(p1 !== p2) { alert("비밀번호가 일치하지 않습니다."); return; }
+
+            try {
+                const res = await fetch('/api/first-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: p1 })
+                });
+                const result = await res.json();
+                if(res.ok && result.success) {
+                    alert("비밀번호가 성공적으로 변경되었습니다.");
+                    location.href = '/';
+                } else {
+                    alert(result.message || "변경 실패");
+                }
+            } catch(e) { alert("서버 통신 에러"); }
+        }
+
+        function openForgotModal() { document.getElementById('forgotModal').style.display = 'flex'; }
+        function closeForgotModal() { document.getElementById('forgotModal').style.display = 'none'; }
+
+        async function doForgot() {
+            const id = document.getElementById('forgotId').value.trim();
+            const email = document.getElementById('forgotEmail').value.trim();
+            if(!id || !email) { alert("아이디와 이메일을 모두 입력해주세요."); return; }
+
+            try {
+                const res = await fetch('/api/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, email })
+                });
+                const result = await res.json();
+                if(res.ok && result.success) {
+                    alert(result.message);
+                    closeForgotModal();
+                } else {
+                    alert(result.message || "요청 실패");
+                }
+            } catch(e) { alert("서버 통신 에러"); }
+        }
+    </script>
+</body>
+</html>

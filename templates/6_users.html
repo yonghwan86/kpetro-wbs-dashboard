@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회원 관리</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background-color: #121212; color: #e0e0e0; padding: 20px; }
+        .container { max-width: 1250px; margin: 0 auto; background: #1a1a1a; padding: 25px; border-radius: 10px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.8); }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { font-size: 22px; color: #ffffff; }
+
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; transition: background 0.2s; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+        .btn-primary { background-color: #2b4f73; color: #fff; border: 1px solid #5b9bd5; }
+        .btn-primary:hover { background-color: #3b6fa5; }
+        .btn-success { background-color: #2e7d32; color: #fff; }
+        .btn-success:hover { background-color: #388e3c; }
+        .btn-danger { background-color: #990000; color: #fff; }
+        .btn-danger:hover { background-color: #cc0000; }
+        .btn-home { background-color: #1b5e20; color: #fff; border: 1px solid #4caf50; }
+        .btn-home:hover { background-color: #2e7d32; }
+        .btn-secondary { background-color: #444; color: #fff; }
+        .btn-secondary:hover { background-color: #555; }
+
+        .top-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #262626; padding: 12px; border-radius: 6px; }
+        .excel-box { display: flex; gap: 10px; align-items: center; font-size: 13px; }
+        input[type="file"] { background: #1a1a1a; border: 1px solid #555; color: #fff; padding: 5px; border-radius: 4px; font-size: 12px; }
+
+        .table-wrapper { max-height: 55vh; overflow-y: auto; border: 1px solid #444; border-radius: 6px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 12px; }
+        th, td { border: 1px solid #444; padding: 8px 6px; white-space: nowrap; }
+        th { background-color: #262626; color: #ddd; position: sticky; top: 0; z-index: 10; }
+        td { background-color: #1a1a1a; }
+
+        /* 모달 스타일 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-box { background: #1a1a1a; padding: 25px; border-radius: 10px; width: 650px; border: 1px solid #444; color: #fff; max-height: 90vh; overflow-y: auto; }
+        .modal-box h3 { margin-bottom: 15px; font-size: 18px; color: #5b9bd5; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .form-row { display: flex; gap: 15px; margin-bottom: 12px; }
+        .form-group { flex: 1; }
+        .form-group label { display: block; font-size: 11px; color: #aaa; margin-bottom: 4px; font-weight: bold; }
+        input, select { width: 100%; background: #262626; border: 1px solid #555; color: #fff; padding: 7px; border-radius: 4px; font-size: 12px; }
+        input:focus, select:focus { border-color: #5b9bd5; outline: none; }
+        
+        .permission-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; background: #222; padding: 10px; border-radius: 6px; border: 1px solid #444; margin-top: 5px; }
+        .permission-item { display: flex; align-items: center; justify-content: space-between; font-size: 12px; background: #2a2a2a; padding: 6px 10px; border-radius: 4px; }
+        .permission-item label { cursor: pointer; color: #ddd; }
+        .permission-item input { width: 16px; height: 16px; cursor: pointer; accent-color: #2b4f73; }
+
+        .modal-btns { text-align: right; display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-bar">
+            <h1>회원 관리</h1>
+            <div style="display: flex; gap: 10px;">
+                <a href="/codes" class="btn btn-secondary">공통 코드 관리로 이동</a>
+                <a href="/" class="btn btn-home">🏠 대시보드로 가기</a>
+            </div>
+        </div>
+
+        <div class="top-actions">
+            <button class="btn btn-primary" onclick="openUserModal()">+ 신규 회원 등록</button>
+            <div class="excel-box">
+                <span>엑셀 파일 이행:</span>
+                <input type="file" id="excelFile" accept=".xlsx, .xls">
+                <button class="btn btn-success" onclick="uploadExcel()">엑셀 업로드 및 이행</button>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>아이디</th>
+                        <th>성명</th>
+                        <th>소속</th>
+                        <th>팀명</th>
+                        <th>직무</th>
+                        <th>핸드폰번호</th>
+                        <th>이메일</th>
+                        <th>개시일</th>
+                        <th>종료일</th>
+                        <th>화면별 접근권한 (Y/N)</th>
+                        <th>관리</th>
+                    </tr>
+                </thead>
+                <tbody id="userTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 회원 등록/수정 모달 -->
+    <div id="userModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 id="modalTitle">회원 정보 입력</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>아이디</label>
+                    <input type="text" id="userId" maxlength="50" placeholder="3~50자">
+                </div>
+                <div class="form-group">
+                    <label>성명</label>
+                    <input type="text" id="userName" placeholder="성명 입력">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>소속</label>
+                    <input type="text" id="userAffiliation" placeholder="소속 입력">
+                </div>
+                <div class="form-group">
+                    <label>팀명 (코드 테이블 연동)</label>
+                    <select id="userTeamName"></select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>직무</label>
+                    <select id="userJobRole"></select>
+                </div>
+                <div class="form-group">
+                    <label>핸드폰번호</label>
+                    <input type="text" id="userPhone" placeholder="010-0000-0000">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>이메일</label>
+                    <input type="text" id="userEmail" placeholder="abc@kcb.com">
+                </div>
+                <div class="form-group">
+                    <label>개시일</label>
+                    <input type="date" id="userStartDate">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>종료일</label>
+                    <input type="date" id="userEndDate">
+                </div>
+                <div class="form-group">
+                    <label>전체 권한 일괄 선택</label>
+                    <div style="padding-top: 6px;">
+                        <button type="button" class="btn btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="toggleAllPermissions(true)">모두 Y</button>
+                        <button type="button" class="btn btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="toggleAllPermissions(false)">모두 N</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 10px;">
+                <label>화면별 접근권한 설정 (Y/N)</label>
+                <div class="permission-grid">
+                    <div class="permission-item"><label for="perm_dash">대시보드</label><input type="checkbox" id="perm_dash" checked></div>
+                    <div class="permission-item"><label for="perm_input">진척관리(단계별)</label><input type="checkbox" id="perm_input" checked></div>
+                    <div class="permission-item"><label for="perm_weekly">진척관리(주차별)</label><input type="checkbox" id="perm_weekly" checked></div>
+                    <div class="permission-item"><label for="perm_meeting">회의 관리</label><input type="checkbox" id="perm_meeting" checked></div>
+                    <div class="permission-item"><label for="perm_config">프로젝트 관리</label><input type="checkbox" id="perm_config" checked></div>
+                    <div class="permission-item"><label for="perm_users">회원 관리</label><input type="checkbox" id="perm_users" checked></div>
+                    <div class="permission-item"><label for="perm_codes">코드 관리</label><input type="checkbox" id="perm_codes" checked></div>
+                </div>
+            </div>
+
+            <div class="modal-btns">
+                <button class="btn btn-secondary" onclick="closeUserModal()">취소</button>
+                <button class="btn btn-success" onclick="saveUser()">저장하기</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadCodeDropdowns() {
+            try {
+                let res = await fetch('/api/codes');
+                let codes = await res.json();
+                
+                // 팀명 코드 동적 로드
+                const teamSelect = document.getElementById('userTeamName');
+                teamSelect.innerHTML = '';
+                const teams = codes.filter(c => 
+                    (c.category_code_name && c.category_code_name.includes('팀')) || 
+                    c.category_code === 'TEAM' || 
+                    c.category_code === 'A01'
+                );
+                teams.forEach(t => {
+                    let opt = document.createElement('option');
+                    opt.value = t.code_name;
+                    opt.textContent = t.code_name;
+                    teamSelect.appendChild(opt);
+                });
+
+                // 직무 코드 동적 로드
+                const jobSelect = document.getElementById('userJobRole');
+                jobSelect.innerHTML = '';
+                const jobs = codes.filter(c => 
+                    (c.category_code_name && (c.category_code_name.includes('직무') || c.category_code_name.includes('역할'))) || 
+                    c.category_code === 'JOB' || 
+                    c.category_code === 'A02'
+                );
+                jobs.forEach(j => {
+                    let opt = document.createElement('option');
+                    opt.value = j.code_name;
+                    opt.textContent = j.code_name;
+                    jobSelect.appendChild(opt);
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/users');
+                if (res.status === 401 || res.status === 403) {
+                    location.href = '/login';
+                    return;
+                }
+                const users = await res.json();
+                const tbody = document.getElementById('userTableBody');
+                tbody.innerHTML = '';
+                users.forEach(u => {
+                    let permDisplay = u.screen_permissions || '';
+                    try {
+                        let obj = JSON.parse(u.screen_permissions);
+                        if(typeof obj === 'object') {
+                            permDisplay = Object.entries(obj).map(([k, v]) => `${k}:${v}`).join(', ');
+                        }
+                    } catch(e) {}
+
+                    const tr = document.createElement('tr');
+                    const values = [u.id, u.name, u.affiliation, u.team_name, u.job_role, u.phone, u.email, u.start_date, u.end_date, permDisplay];
+                    values.forEach((value, index) => {
+                        const td = document.createElement('td');
+                        td.textContent = value || '';
+                        if (index === 0) td.style.fontWeight = 'bold';
+                        if (index === 9) {
+                            td.style.textAlign = 'left';
+                            td.style.fontSize = '11px';
+                            td.style.color = '#8faecf';
+                        }
+                        tr.appendChild(td);
+                    });
+                    const actions = document.createElement('td');
+                    const editButton = document.createElement('button');
+                    editButton.className = 'btn btn-primary';
+                    editButton.style.cssText = 'padding:3px 8px; font-size:11px; margin-right:4px;';
+                    editButton.textContent = '수정';
+                    editButton.addEventListener('click', () => openEditUser(u));
+                    const resetButton = document.createElement('button');
+                    resetButton.className = 'btn btn-secondary';
+                    resetButton.style.cssText = 'padding:3px 8px; font-size:11px; margin-right:4px;';
+                    resetButton.textContent = '비밀번호 초기화';
+                    resetButton.addEventListener('click', () => resetPassword(u.id));
+                    const deleteButton = document.createElement('button');
+                    deleteButton.className = 'btn btn-danger';
+                    deleteButton.style.cssText = 'padding:3px 8px; font-size:11px;';
+                    deleteButton.textContent = '삭제';
+                    deleteButton.disabled = u.is_admin;
+                    deleteButton.title = u.is_admin ? '관리자 계정은 이 화면에서 삭제하지 않습니다.' : '';
+                    deleteButton.addEventListener('click', () => deleteUser(u.id));
+                    actions.append(editButton, resetButton, deleteButton);
+                    tr.appendChild(actions);
+                    tbody.appendChild(tr);
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        async function openUserModal() {
+            await loadCodeDropdowns();
+            document.getElementById('modalTitle').textContent = "신규 회원 등록";
+            document.getElementById('userId').value = '';
+            document.getElementById('userId').disabled = false;
+            document.getElementById('userName').value = '';
+            document.getElementById('userAffiliation').value = '';
+            document.getElementById('userPhone').value = '';
+            document.getElementById('userEmail').value = '';
+            document.getElementById('userStartDate').value = '';
+            document.getElementById('userEndDate').value = '';
+            toggleAllPermissions(true);
+            document.getElementById('userModal').style.display = 'flex';
+        }
+
+        async function openEditUser(u) {
+            await loadCodeDropdowns();
+            document.getElementById('modalTitle').textContent = "회원 정보 수정";
+            document.getElementById('userId').value = u.id;
+            document.getElementById('userId').disabled = true;
+            document.getElementById('userName').value = u.name || '';
+            document.getElementById('userAffiliation').value = u.affiliation || '';
+            document.getElementById('userTeamName').value = u.team_name || '';
+            document.getElementById('userJobRole').value = u.job_role || '';
+            document.getElementById('userPhone').value = u.phone || '';
+            document.getElementById('userEmail').value = u.email || '';
+            document.getElementById('userStartDate').value = u.start_date || '';
+            document.getElementById('userEndDate').value = u.end_date || '';
+
+            let perms = { 대시보드:'Y', 단계별진척:'Y', 주차별진척:'Y', 회의관리:'Y', 프로젝트관리:'Y', 회원관리:'Y', 코드관리:'Y' };
+            try {
+                let parsed = JSON.parse(u.screen_permissions);
+                if(typeof parsed === 'object') perms = parsed;
+            } catch(e) {}
+
+            document.getElementById('perm_dash').checked = (perms['대시보드'] === 'Y');
+            document.getElementById('perm_input').checked = (perms['단계별진척'] === 'Y');
+            document.getElementById('perm_weekly').checked = (perms['주차별진척'] === 'Y');
+            document.getElementById('perm_meeting').checked = (perms['회의관리'] === 'Y');
+            document.getElementById('perm_config').checked = (perms['프로젝트관리'] === 'Y');
+            document.getElementById('perm_users').checked = (perms['회원관리'] === 'Y');
+            document.getElementById('perm_codes').checked = (perms['코드관리'] === 'Y');
+
+            document.getElementById('userModal').style.display = 'flex';
+        }
+
+        function toggleAllPermissions(status) {
+            document.getElementById('perm_dash').checked = status;
+            document.getElementById('perm_input').checked = status;
+            document.getElementById('perm_weekly').checked = status;
+            document.getElementById('perm_meeting').checked = status;
+            document.getElementById('perm_config').checked = status;
+            document.getElementById('perm_users').checked = status;
+            document.getElementById('perm_codes').checked = status;
+        }
+
+        function closeUserModal() {
+            document.getElementById('userModal').style.display = 'none';
+        }
+
+        async function saveUser() {
+            const id = document.getElementById('userId').value.trim();
+            const name = document.getElementById('userName').value.trim();
+            
+            if(id.length < 3 || id.length > 50) {
+                alert("아이디는 3~50자로 입력해주세요.");
+                return; 
+            }
+            if(!name) { 
+                alert("성명을 입력해주세요."); 
+                return; 
+            }
+
+            const permissionsObj = {
+                "대시보드": document.getElementById('perm_dash').checked ? "Y" : "N",
+                "단계별진척": document.getElementById('perm_input').checked ? "Y" : "N",
+                "주차별진척": document.getElementById('perm_weekly').checked ? "Y" : "N",
+                "회의관리": document.getElementById('perm_meeting').checked ? "Y" : "N",
+                "프로젝트관리": document.getElementById('perm_config').checked ? "Y" : "N",
+                "회원관리": document.getElementById('perm_users').checked ? "Y" : "N",
+                "코드관리": document.getElementById('perm_codes').checked ? "Y" : "N"
+            };
+
+            const payload = {
+                id: id,
+                name: name,
+                affiliation: document.getElementById('userAffiliation').value,
+                team_name: document.getElementById('userTeamName').value,
+                job_role: document.getElementById('userJobRole').value,
+                phone: document.getElementById('userPhone').value,
+                email: document.getElementById('userEmail').value,
+                start_date: document.getElementById('userStartDate').value,
+                end_date: document.getElementById('userEndDate').value,
+                screen_permissions: JSON.stringify(permissionsObj)
+            };
+
+            try {
+                const res = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await res.json();
+                if(res.ok && result.success) {
+                    if (result.temporary_password) {
+                        alert(`회원이 등록되었습니다.\n임시 비밀번호: ${result.temporary_password}\n이 값은 다시 표시되지 않으니 안전하게 전달해주세요.`);
+                    } else {
+                        alert("저장되었습니다.");
+                    }
+                    closeUserModal();
+                    loadUsers();
+                } else {
+                    alert(result.message || "저장 실패");
+                }
+            } catch(e) { alert("통신 에러"); }
+        }
+
+        async function deleteUser(id) {
+            if(!confirm(`정말 회원 [${id}]님을 삭제하시겠습니까?`)) return;
+            try {
+                const res = await fetch('/api/users', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                const result = await res.json();
+                if(res.ok && result.success) { loadUsers(); }
+                else alert(result.message || '삭제하지 못했습니다.');
+            } catch(e) { alert("삭제 에러"); }
+        }
+
+        async function resetPassword(id) {
+            if (!confirm(`[${id}] 계정의 비밀번호를 초기화하시겠습니까?`)) return;
+            try {
+                const res = await fetch(`/api/users/${encodeURIComponent(id)}/reset-password`, { method: 'POST' });
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    alert(`임시 비밀번호: ${result.temporary_password}\n이 값은 다시 표시되지 않으니 안전하게 전달해주세요.`);
+                } else {
+                    alert(result.message || '비밀번호를 초기화하지 못했습니다.');
+                }
+            } catch(e) { alert('통신 에러'); }
+        }
+
+        async function uploadExcel() {
+            const fileInput = document.getElementById('excelFile');
+            if(!fileInput.files || fileInput.files.length === 0) { alert("업로드할 엑셀 파일을 선택해주세요."); return; }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const res = await fetch('/api/users/import', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await res.json();
+                if(res.ok && result.success) {
+                    let message = result.message;
+                    if (result.temporary_passwords && result.temporary_passwords.length) {
+                        message += '\n\n신규 계정 임시 비밀번호:\n' + result.temporary_passwords
+                            .map(item => `${item.id}: ${item.temporary_password}`)
+                            .join('\n');
+                        message += '\n\n이 값은 다시 표시되지 않으니 안전하게 보관·전달해주세요.';
+                    }
+                    alert(message);
+                    loadUsers();
+                    fileInput.value = '';
+                } else {
+                    alert("이행 실패: " + (result.message || '알 수 없는 오류'));
+                }
+            } catch(e) { alert("엑셀 업로드 통신 에러"); }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            loadUsers();
+        });
+    </script>
+</body>
+</html>

@@ -3,3 +3,6 @@ Flask-Cors>=6,<7
 PyMySQL>=1.1,<2
 python-dotenv>=1.1,<2
 waitress>=3,<4
+pandas>=2.2,<4
+openpyxl>=3.1,<4
+xlrd>=2,<3

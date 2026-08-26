@@ -26,11 +26,20 @@ services:
       DB_NAME: ${DB_NAME:-wbs_db}
       DB_USER: ${DB_USER:-wbs_user}
       DB_PASSWORD: ${DB_PASSWORD:-change-this-password}
+      SECRET_KEY: ${SECRET_KEY:-replace-with-a-long-random-secret}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      SESSION_LIFETIME_MINUTES: ${SESSION_LIFETIME_MINUTES:-480}
+      PUBLIC_DASHBOARD: ${PUBLIC_DASHBOARD:-true}
+      INITIAL_ADMIN_ID: ${INITIAL_ADMIN_ID:-admin}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-replace-with-a-strong-initial-password}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@example.invalid}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       APP_HOST: 0.0.0.0
       APP_PORT: 3000
       FLASK_DEBUG: "false"
       UPLOAD_FOLDER: uploads
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
+      ALLOWED_UPLOAD_EXTENSIONS: ${ALLOWED_UPLOAD_EXTENSIONS:-pdf,doc,docx,hwp,hwpx,xls,xlsx,ppt,pptx,txt,png,jpg,jpeg}
     ports:
       - "3000:3000"
     volumes:

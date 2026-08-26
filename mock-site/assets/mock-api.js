@@ -12,8 +12,8 @@
 
     var DEFAULT_WBS = {
         '1. 통합업무시스템_1. 공통': { weight: 10, plan: 35, actual: 35, start_date: '2026-08-03', end_date: '2026-08-28', date: '2026-08-21' },
-        '1. 통합업무시스템_2. 요구분석': { weight: 15, plan: 30, actual: 28, start_date: '2026-08-17', end_date: '2026-09-18', date: '2026-08-21' },
-        '1. 통합업무시스템_3. 설계': { weight: 20, plan: 12, actual: 10, start_date: '2026-09-07', end_date: '2026-10-09', date: '2026-08-21' },
+        '1. 통합업무시스템_2. 요구분석': { weight: 15, plan: 30, actual: 28, start_date: '2026-08-17', end_date: '2026-09-18', date: '2026-08-21', delay_reason: '외부 연계기관의 확인 일정이 예정보다 늦어졌습니다.', recovery_plan: '확인 항목을 분리해 선행 가능한 분석부터 완료합니다.' },
+        '1. 통합업무시스템_3. 설계': { weight: 20, plan: 12, actual: 10, start_date: '2026-09-07', end_date: '2026-10-09', date: '2026-08-21', delay_reason: '', recovery_plan: '' },
         '1. 통합업무시스템_4. 구현': { weight: 35, plan: 5, actual: 4, start_date: '2026-09-28', end_date: '2026-11-27', date: '2026-08-21' },
         '1. 통합업무시스템_5. 테스트': { weight: 10, plan: 0, actual: 0, start_date: '2026-11-02', end_date: '2026-12-18', date: '2026-08-21' },
         '1. 통합업무시스템_6. 이행': { weight: 10, plan: 0, actual: 0, start_date: '2026-11-23', end_date: '2026-12-23', date: '2026-08-21' },
@@ -34,6 +34,30 @@
         plan: [5, 9, 14, 18, 23, 28, 34, 40, 47, 54, 61, 68, 74, 80, 85, 89, 93, 96, 98, 100, 100],
         actual: [5, 9, 13, 17, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]
     };
+
+    var DEFAULT_USERS = [
+        {
+            id: 'admin', name: '시스템관리자', affiliation: '한국석유관리원', team_name: 'PMO팀',
+            job_role: '시스템관리', phone: '010-0000-0000', email: 'admin@example.invalid',
+            start_date: '2026-08-01', end_date: '2026-12-31', screen_permissions: 'all',
+            is_first_login: false, is_admin: true
+        },
+        {
+            id: 'user0001', name: '홍길동', affiliation: '수행사', team_name: '개발팀',
+            job_role: '개발담당', phone: '010-1234-5678', email: 'user0001@example.invalid',
+            start_date: '2026-08-03', end_date: '2026-12-31',
+            screen_permissions: JSON.stringify({ '대시보드': 'Y', '단계별진척': 'Y', '주차별진척': 'Y', '회의관리': 'Y', '프로젝트관리': 'N', '회원관리': 'N', '코드관리': 'N' }),
+            is_first_login: false, is_admin: false
+        }
+    ];
+
+    var DEFAULT_CODES = [
+        { id: 1, category_code: 'TEAM', category_code_name: '팀명', code_value: 'DEV', code_name: '개발팀', sort_order: 1 },
+        { id: 2, category_code: 'TEAM', category_code_name: '팀명', code_value: 'PMO', code_name: 'PMO팀', sort_order: 2 },
+        { id: 3, category_code: 'TEAM', category_code_name: '팀명', code_value: 'OPS', code_name: '운영팀', sort_order: 3 },
+        { id: 4, category_code: 'JOB', category_code_name: '직무', code_value: 'DEV', code_name: '개발담당', sort_order: 1 },
+        { id: 5, category_code: 'JOB', category_code_name: '직무', code_value: 'PM', code_name: '사업관리', sort_order: 2 }
+    ];
 
     var DEFAULT_MEETINGS = [
         {
@@ -124,10 +148,12 @@
 
     function meetingFromForm(body, existing) {
         var meeting = existing || {};
-        var fields = ['title', 'meeting_date', 'meeting_time', 'location', 'attendees', 'agenda', 'password', 'content', 'summary', 'others'];
+        var fields = ['title', 'meeting_date', 'meeting_time', 'location', 'attendees', 'agenda', 'content', 'summary', 'others'];
         fields.forEach(function (field) {
             meeting[field] = String(getFormValue(body, field) || '');
         });
+        var submittedPassword = String(getFormValue(body, 'password') || '');
+        if (submittedPassword || !meeting.password) meeting.password = submittedPassword;
         if (meeting.meeting_time && meeting.meeting_time.length === 5) meeting.meeting_time += ':00';
         if (!meeting.files) meeting.files = [];
 
@@ -154,6 +180,31 @@
             return response({ error: '지원하지 않는 요청입니다.' }, 404);
         }
 
+        if (path === '/api/session') {
+            var mockSession = load('session', { authenticated: false });
+            return response(mockSession);
+        }
+
+        if (path === '/api/login' && method === 'POST') {
+            var loginPayload = getJsonBody(options) || {};
+            if (loginPayload.id !== 'admin' || loginPayload.password !== 'mock1234') {
+                return response({ success: false, message: '목업 계정은 admin / mock1234 입니다.' }, 401);
+            }
+            save('session', {
+                authenticated: true, user_id: 'admin', user_name: '시스템관리자',
+                is_admin: true, is_first_login: false, screen_permissions: { all: 'Y' }
+            });
+            return response({ success: true, is_first_login: false, mock: true });
+        }
+
+        if (path === '/api/forgot-password' && method === 'POST') {
+            return response({ success: true, message: '실제 서비스에서는 관리자가 임시 비밀번호를 발급합니다. 이 화면은 목업입니다.' });
+        }
+
+        if (path === '/api/first-password' && method === 'POST') {
+            return response({ success: true, mock: true });
+        }
+
         if (path === '/api/config') {
             if (method === 'GET') return response(load('config', DEFAULT_CONFIG));
             var config = load('config', DEFAULT_CONFIG);
@@ -162,6 +213,95 @@
             config.start_date = String(getFormValue(options.body, 'start_date') || config.start_date);
             config.end_date = String(getFormValue(options.body, 'end_date') || config.end_date);
             save('config', config);
+            return response({ success: true, mock: true });
+        }
+
+        if (path === '/api/users') {
+            var users = load('users', DEFAULT_USERS);
+            if (method === 'GET') return response(users);
+            var userPayload = getJsonBody(options) || {};
+            var userIndex = users.findIndex(function (item) { return item.id === userPayload.id; });
+            if (method === 'DELETE') {
+                if (userIndex < 0) return response({ success: false, message: '회원을 찾을 수 없습니다.' }, 404);
+                if (users[userIndex].is_admin) return response({ success: false, message: '목업 관리자 계정은 삭제할 수 없습니다.' }, 400);
+                users.splice(userIndex, 1);
+                save('users', users);
+                return response({ success: true, mock: true });
+            }
+            if (!userPayload.id || !userPayload.name) {
+                return response({ success: false, message: '아이디와 성명은 필수입니다.' }, 400);
+            }
+            var createdUser = userIndex < 0;
+            var savedUser = {
+                id: String(userPayload.id), name: String(userPayload.name),
+                affiliation: String(userPayload.affiliation || ''), team_name: String(userPayload.team_name || ''),
+                job_role: String(userPayload.job_role || ''), phone: String(userPayload.phone || ''),
+                email: String(userPayload.email || ''), start_date: String(userPayload.start_date || ''),
+                end_date: String(userPayload.end_date || ''), screen_permissions: userPayload.screen_permissions || '{}',
+                is_first_login: createdUser, is_admin: userIndex >= 0 ? Boolean(users[userIndex].is_admin) : false
+            };
+            if (userIndex >= 0) users[userIndex] = savedUser;
+            else users.push(savedUser);
+            save('users', users);
+            return response({ success: true, created: createdUser, temporary_password: createdUser ? 'Mock-1234!' : null, mock: true });
+        }
+
+        var resetPasswordMatch = path.match(/^\/api\/users\/([^/]+)\/reset-password$/);
+        if (resetPasswordMatch && method === 'POST') {
+            return response({ success: true, temporary_password: 'Mock-1234!', mock: true });
+        }
+
+        if (path === '/api/users/import' && method === 'POST') {
+            return response({
+                success: true,
+                message: '목업에서는 엑셀 파일 선택 흐름만 확인합니다. 실제 서버에서는 행을 검증해 회원 정보를 반영합니다.',
+                temporary_passwords: [], mock: true
+            });
+        }
+
+        if (path === '/api/codes') {
+            var codes = load('codes', DEFAULT_CODES);
+            if (method === 'GET') {
+                var categoryMatch = target.search.match(/[?&]category=([^&]+)/);
+                if (categoryMatch) {
+                    var category = decodeURIComponent(categoryMatch[1]);
+                    codes = codes.filter(function (item) { return item.category_code === category; });
+                }
+                return response(codes.sort(function (a, b) {
+                    return (a.category_code + String(a.sort_order).padStart(6, '0')).localeCompare(b.category_code + String(b.sort_order).padStart(6, '0'));
+                }));
+            }
+            var codePayload = getJsonBody(options) || {};
+            var codeIndex = codes.findIndex(function (item) { return item.id === Number(codePayload.id); });
+            if (method === 'DELETE') {
+                if (codeIndex >= 0) codes.splice(codeIndex, 1);
+                save('codes', codes);
+                return response({ success: true, mock: true });
+            }
+            if (!codePayload.category_code || !codePayload.code_value || !codePayload.code_name) {
+                return response({ success: false, message: '분류코드, 코드값, 코드명은 필수입니다.' }, 400);
+            }
+            var savedCode = {
+                id: codeIndex >= 0 ? codes[codeIndex].id : codes.reduce(function (max, item) { return Math.max(max, item.id); }, 0) + 1,
+                category_code: String(codePayload.category_code),
+                category_code_name: String(codePayload.category_code_name || ''),
+                code_value: String(codePayload.code_value), code_name: String(codePayload.code_name),
+                sort_order: Number(codePayload.sort_order) || 0
+            };
+            if (codeIndex >= 0) codes[codeIndex] = savedCode;
+            else codes.push(savedCode);
+            save('codes', codes);
+            return response({ success: true, mock: true });
+        }
+
+        if (path === '/api/wbs/delay' && method === 'POST') {
+            var delayPayload = getJsonBody(options) || {};
+            var delayedWbs = load('wbs', DEFAULT_WBS);
+            var delayKey = delayPayload.system_name + '_' + delayPayload.phase_name;
+            if (!delayedWbs[delayKey]) return response({ success: false, message: 'WBS 항목을 찾을 수 없습니다.' }, 404);
+            delayedWbs[delayKey].delay_reason = String(delayPayload.delay_reason || '');
+            delayedWbs[delayKey].recovery_plan = String(delayPayload.recovery_plan || '');
+            save('wbs', delayedWbs);
             return response({ success: true, mock: true });
         }
 
@@ -185,7 +325,9 @@
                         actual: Number(item.actual) || 0,
                         start_date: item.start_date || '',
                         end_date: item.end_date || '',
-                        date: item.date || ''
+                        date: item.date || '',
+                        delay_reason: (wbs[newKey] && wbs[newKey].delay_reason) || '',
+                        recovery_plan: (wbs[newKey] && wbs[newKey].recovery_plan) || ''
                     };
                 });
                 save('wbs', wbs);
@@ -223,7 +365,11 @@
             meetings.sort(function (a, b) {
                 return (b.meeting_date + b.meeting_time).localeCompare(a.meeting_date + a.meeting_time);
             });
-            return response(meetings);
+            return response(meetings.map(function (meeting) {
+                var publicMeeting = clone(meeting);
+                delete publicMeeting.password;
+                return publicMeeting;
+            }));
         }
 
         if (path === '/api/meetings' && method === 'POST') {

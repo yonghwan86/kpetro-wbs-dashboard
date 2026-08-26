@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="3600">
     <title id="pageTitle">프로젝트 구축 현황</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { width: 100%; height: 100vh; overflow: hidden; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background-color: #121212; color: #e0e0e0; }
@@ -50,10 +51,23 @@
         .dot-green { background-color: #70a33a; }
         .dot-yellow { background-color: #cc9900; }
         .dot-red { background-color: #cc0000; }
+        .dot-red.is-editable { width: 14px; height: 14px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .dot-red.is-editable:hover { transform: scale(1.2); box-shadow: 0 0 9px rgba(255, 77, 77, 0.9); }
 
-        .bottom-nav { flex: 0 0 auto; display: flex; justify-content: center; gap: 15px; padding-top: 5px; }
+        .bottom-nav { flex: 0 0 auto; display: flex; justify-content: center; gap: 10px; padding-top: 5px; flex-wrap: wrap; }
         .nav-btn { background-color: #2b4f73; color: #fff; border: 1px solid #5b9bd5; padding: 8px 20px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; text-decoration: none; transition: background 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
         .nav-btn:hover { background-color: #3b6fa5; }
+
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.78); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-box { width: min(520px, 92vw); background: #1a1a1a; border: 1px solid #444; border-radius: 10px; padding: 24px; box-shadow: 0 8px 28px rgba(0,0,0,0.8); }
+        .modal-box h3 { margin-bottom: 16px; color: #ff7777; font-size: 18px; }
+        .modal-group { margin-bottom: 14px; }
+        .modal-group label { display: block; margin-bottom: 5px; color: #bbb; font-size: 13px; font-weight: bold; }
+        .modal-group textarea { width: 100%; min-height: 90px; padding: 10px; color: #fff; background: #252525; border: 1px solid #555; border-radius: 6px; resize: vertical; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+        .modal-actions button { padding: 8px 16px; border: 0; border-radius: 5px; color: #fff; cursor: pointer; }
+        .modal-cancel { background: #555; }
+        .modal-save { background: #2e7d32; }
 
         /* --- A4 한 페이지 인쇄 최적화 스타일 --- */
         @media print {
@@ -146,21 +160,66 @@
         </div>
     </div>
 
+    {% if can_edit_delay %}
+    <div id="delayModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="delayModalTitle">
+        <div class="modal-box">
+            <h3 id="delayModalTitle">지연 사유 및 만회 계획</h3>
+            <div class="modal-group">
+                <label for="delayReason">지연 사유</label>
+                <textarea id="delayReason" maxlength="4000" placeholder="지연 원인과 현재 상황을 입력하세요."></textarea>
+            </div>
+            <div class="modal-group">
+                <label for="recoveryPlan">만회 계획</label>
+                <textarea id="recoveryPlan" maxlength="4000" placeholder="일정 만회를 위한 조치와 목표일을 입력하세요."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="modal-cancel" id="delayCancel">취소</button>
+                <button type="button" class="modal-save" id="delaySave">저장</button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="bottom-nav">
+        {% if can_input %}
         <a href="/input" class="nav-btn">진척관리(단계별)</a>
+        {% endif %}
+        {% if can_weekly %}
         <a href="/weekly-input" class="nav-btn">진척관리(주차별)</a>
+        {% endif %}
+        {% if can_meetings %}
         <a href="/meetings" class="nav-btn" style="background-color: #3b5998;">회의 관리</a>
+        {% endif %}
+        {% if can_project %}
         <a href="/project-config" class="nav-btn" style="background-color: #4a3380;">프로젝트 관리</a>
+        {% endif %}
+        {% if is_admin %}
+        <a href="/users" class="nav-btn" style="background-color: #6a1b9a;">회원 관리</a>
+        <a href="/codes" class="nav-btn" style="background-color: #006064;">코드 관리</a>
+        {% endif %}
         <button class="nav-btn" onclick="window.print()">출력</button>
+        {% if is_authenticated %}
+        <a href="/logout" class="nav-btn" style="background-color: #555;">로그아웃</a>
+        {% else %}
+        <a href="/login" class="nav-btn" style="background-color: #555;">관리자 로그인</a>
+        {% endif %}
     </div>
 
     <script>
         let currentFilter = 'all';
+        const canEditDelay = {{ 'true' if can_edit_delay else 'false' }};
+        let editingDelayItem = null;
 
         // 맨 앞의 숫자와 점(예: "1. ", "2. ")을 숨기기 위한 헬퍼 함수
         function cleanDisplayLabel(text) {
             if (!text) return '';
             return text.replace(/^\d+[\.\s\-]+\s*/, '');
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[char]);
         }
 
         function setFilter(mode) {
@@ -183,10 +242,48 @@
             window.updateDashboard();
         }
 
+        function openDelayModal(systemName, phaseName, item) {
+            if (!canEditDelay) return;
+            editingDelayItem = { systemName, phaseName };
+            document.getElementById('delayModalTitle').textContent =
+                `${cleanDisplayLabel(systemName)} > ${cleanDisplayLabel(phaseName)} 지연 관리`;
+            document.getElementById('delayReason').value = item.delay_reason || '';
+            document.getElementById('recoveryPlan').value = item.recovery_plan || '';
+            document.getElementById('delayModal').style.display = 'flex';
+        }
+
+        function closeDelayModal() {
+            if (!canEditDelay) return;
+            editingDelayItem = null;
+            document.getElementById('delayModal').style.display = 'none';
+        }
+
+        async function saveDelayData() {
+            if (!editingDelayItem) return;
+            const response = await fetch('/api/wbs/delay', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    system_name: editingDelayItem.systemName,
+                    phase_name: editingDelayItem.phaseName,
+                    delay_reason: document.getElementById('delayReason').value,
+                    recovery_plan: document.getElementById('recoveryPlan').value
+                })
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                if (response.status === 401) window.location.href = '/login';
+                else alert(result.message || '지연 정보를 저장하지 못했습니다.');
+                return;
+            }
+            closeDelayModal();
+            window.updateDashboard();
+        }
+
         document.addEventListener("DOMContentLoaded", function() {
             Chart.register(ChartDataLabels);
 
-            const projectStartDate = new Date('2026-08-03');
+            let projectStartDate = new Date('2026-08-01T00:00:00');
             const weekMapping = [
                 { globalW: 1, monthW: 1 }, { globalW: 2, monthW: 2 }, { globalW: 3, monthW: 3 }, { globalW: 4, monthW: 4 },
                 { globalW: 5, monthW: 1 }, { globalW: 6, monthW: 2 }, { globalW: 7, monthW: 3 }, { globalW: 8, monthW: 4 }, { globalW: 9, monthW: 5 },
@@ -194,7 +291,7 @@
                 { globalW: 14, monthW: 1 }, { globalW: 15, monthW: 2 }, { globalW: 16, monthW: 3 }, { globalW: 17, monthW: 4 },
                 { globalW: 18, monthW: 1 }, { globalW: 19, monthW: 2 }, { globalW: 20, monthW: 3 }, { globalW: 21, monthW: 4 }
             ];
-            const currentGlobalWeek = 3;
+            let currentGlobalWeek = 1;
 
             function buildColGroups() {
                 const widths = ['15%', '16%', '7%', '7%', '7%'];
@@ -214,19 +311,31 @@
             buildColGroups();
 
             const headerWeekRow = document.getElementById('headerWeekRow');
-            weekMapping.forEach(item => {
-                let th = document.createElement('th');
-                if (item.globalW === 14) {
-                    th.className = 'timeline-cell gate-header';
-                    th.textContent = item.monthW;
-                } else {
-                    let cls = 'week-header timeline-cell';
-                    if (item.globalW === currentGlobalWeek) cls += ' current-week-line';
-                    th.className = cls;
-                    th.textContent = item.monthW;
-                }
-                headerWeekRow.appendChild(th);
-            });
+            function buildWeekHeader() {
+                headerWeekRow.innerHTML = '';
+                weekMapping.forEach(item => {
+                    let th = document.createElement('th');
+                    if (item.globalW === 14) {
+                        th.className = 'timeline-cell gate-header';
+                        th.textContent = item.monthW;
+                    } else {
+                        let cls = 'week-header timeline-cell';
+                        if (item.globalW === currentGlobalWeek) cls += ' current-week-line';
+                        th.className = cls;
+                        th.textContent = item.monthW;
+                    }
+                    headerWeekRow.appendChild(th);
+                });
+            }
+
+            if (canEditDelay) {
+                document.getElementById('delayCancel').addEventListener('click', closeDelayModal);
+                document.getElementById('delaySave').addEventListener('click', saveDelayData);
+                document.getElementById('delayModal').addEventListener('click', event => {
+                    if (event.target.id === 'delayModal') closeDelayModal();
+                });
+            }
+            buildWeekHeader();
 
             const bodyBox = document.getElementById('bodyBox');
             const headerBox = document.getElementById('headerBox');
@@ -258,6 +367,12 @@
                     if (config.target_date) {
                         targetTimestamp = new Date(config.target_date + 'T00:00:00').getTime();
                     }
+                    if (config.start_date) {
+                        projectStartDate = new Date(config.start_date + 'T00:00:00');
+                    }
+                    const elapsedWeeks = Math.floor((new Date() - projectStartDate) / (7 * 24 * 60 * 60 * 1000));
+                    currentGlobalWeek = Math.max(1, Math.min(weekMapping.length, elapsedWeeks + 1));
+                    buildWeekHeader();
                 } catch(e) { console.error(e); }
             }
 
@@ -402,6 +517,7 @@
                             const diff = (a - p).toFixed(1);
                             let dotClass = 'dot-green';
                             if (diff < 0) dotClass = diff <= -1.0 ? 'dot-red' : 'dot-yellow';
+                            const editableClass = dotClass === 'dot-red' && canEditDelay ? ' is-editable' : '';
 
                             const startWeek = getDateWeek(item.start_date);
                             const endWeek = getDateWeek(item.end_date);
@@ -409,15 +525,14 @@
                             let tr = document.createElement('tr');
                             if (index === 0) {
                                 // 화면 표시 시 번호 제거된 이름(cleanDisplayLabel) 사용
-                                tr.innerHTML += `<td rowspan="${phases.length}" style="font-weight:bold; color: #fff; background-color: #1a1a1a;">${cleanDisplayLabel(sys)}</td>`;
+                                tr.innerHTML += `<td rowspan="${phases.length}" style="font-weight:bold; color: #fff; background-color: #1a1a1a;">${escapeHtml(cleanDisplayLabel(sys))}</td>`;
                             }
                             tr.innerHTML += `
-                                <td style="background-color: #1a1a1a;">${cleanDisplayLabel(item.phase)}</td>
+                                <td style="background-color: #1a1a1a;">${escapeHtml(cleanDisplayLabel(item.phase))}</td>
                                 <td style="background-color: #1a1a1a;">${p}%</td>
                                 <td style="background-color: #1a1a1a;">${a}%</td>
-                                <td style="background-color: #1a1a1a;"><span class="dot ${dotClass}"></span> ${diff > 0 ? '+' + diff : diff}%</td>
+                                <td style="background-color: #1a1a1a;"><span class="dot ${dotClass}${editableClass}"></span> ${diff > 0 ? '+' + diff : diff}%</td>
                             `;
-
                             weekMapping.forEach(wItem => {
                                 let classes = ['timeline-cell'];
                                 if (item.start_date && item.end_date && wItem.globalW >= startWeek && wItem.globalW <= endWeek) {
@@ -426,6 +541,17 @@
                                 if (wItem.globalW === currentGlobalWeek) classes.push('current-week-line');
                                 tr.innerHTML += `<td class="${classes.join(' ')}" style="background-color: #1a1a1a;"></td>`;
                             });
+                            if (dotClass === 'dot-red' && canEditDelay) {
+                                const statusDot = tr.querySelector('.dot-red');
+                                statusDot.title = '지연 사유 및 만회 계획 입력';
+                                statusDot.setAttribute('role', 'button');
+                                statusDot.tabIndex = 0;
+                                const openEditor = () => openDelayModal(sys, item.phase, item);
+                                statusDot.addEventListener('click', openEditor);
+                                statusDot.addEventListener('keydown', event => {
+                                    if (event.key === 'Enter' || event.key === ' ') openEditor();
+                                });
+                            }
                             tbody.appendChild(tr);
                         });
                     }
@@ -443,8 +569,7 @@
                 updateTimer();
                 updateDashboard();
             });
-            setInterval(updateTimer, 1000);
-            setInterval(updateDashboard, 3000);
+            setInterval(updateDashboard, 60 * 60 * 1000);
         });
     </script>
 </body>
