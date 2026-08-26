@@ -64,8 +64,9 @@ Vercel에는 `mock-site` 정적 목업만 배포합니다. Flask/MariaDB 앱은 
 
 GitHub의 `main` 브랜치에 푸시하면 Vercel 운영 사이트가 자동 배포됩니다. 기능 작업은 별도 브랜치에서 진행하면 Pull Request마다 Vercel 미리보기 배포를 사용할 수 있습니다.
 
+수동 배포가 필요하면 프로젝트 루트(`wbs_project`)에서 실행합니다. Vercel 프로젝트의 Root Directory가 이미 `mock-site`로 설정되어 있으므로 `mock-site` 안에서 실행하면 경로가 이중 적용됩니다.
+
 ```powershell
-Set-Location .\mock-site
 npx --yes vercel@latest login
 npx --yes vercel@latest link --project kpetro-wbs-dashboard
 npx --yes vercel@latest --prod
