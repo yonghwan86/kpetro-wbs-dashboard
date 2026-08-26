@@ -60,6 +60,8 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 Vercel에는 `mock-site` 정적 목업만 배포합니다. Flask/MariaDB 앱은 Vercel 정적 배포 대상이 아닙니다.
 
+GitHub의 `main` 브랜치에 푸시하면 Vercel 운영 사이트가 자동 배포됩니다. 기능 작업은 별도 브랜치에서 진행하면 Pull Request마다 Vercel 미리보기 배포를 사용할 수 있습니다.
+
 ```powershell
 Set-Location .\mock-site
 npx --yes vercel@latest login
@@ -68,6 +70,7 @@ npx --yes vercel@latest --prod
 ```
 
 - 현재 공개 주소: <https://kpetrowbs.vercel.app/>
+- GitHub 저장소: <https://github.com/yonghwan86/kpetro-wbs-dashboard>
 - Vercel 계정 `yonghwan86s-projects`에 접근 권한이 있어야 기존 프로젝트로 배포할 수 있습니다.
 
 ## 주요 폴더
