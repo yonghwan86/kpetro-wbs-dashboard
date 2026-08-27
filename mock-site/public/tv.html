@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="refresh" content="3600">
-    <meta name="kpetro-build" content="2026-08-26-navigation-v1">
+    <meta name="kpetro-build" content="2026-08-27-tv-chart-labels-v1">
     <title id="pageTitle">프로젝트 구축 현황</title>
     <meta name="robots" content="noindex,nofollow,noarchive">
     <link rel="icon" href="/favicon.ico" sizes="any">
@@ -374,6 +374,60 @@
             let currentGlobalWeek = 1;
             let gateWeek = 0;
 
+            function progressLabelStep(context) {
+                const labelCount = Math.max(1, context.chart.data.labels.length);
+                const chartWidth = context.chart.chartArea
+                    ? context.chart.chartArea.width
+                    : context.chart.width;
+                const availablePerPoint = chartWidth / Math.max(1, labelCount - 1);
+                const minimumSpacing = document.body.classList.contains('tv-display') ? 46 : 38;
+                return Math.max(1, Math.ceil(minimumSpacing / Math.max(1, availablePerPoint)));
+            }
+
+            function shouldShowProgressLabel(context) {
+                const value = Number(context.dataset.data[context.dataIndex]);
+                if (!Number.isFinite(value)) return false;
+
+                const step = progressLabelStep(context);
+                if (step === 1) return true;
+
+                let lastValueIndex = -1;
+                context.dataset.data.forEach((item, index) => {
+                    if (item !== null && item !== undefined && item !== '' && Number.isFinite(Number(item))) {
+                        lastValueIndex = index;
+                    }
+                });
+                if (context.dataIndex === lastValueIndex) return true;
+                if (context.dataIndex % step !== 0) return false;
+
+                // 마지막 실적 라벨 바로 앞 라벨은 숨겨 서로 겹치지 않게 한다.
+                return lastValueIndex - context.dataIndex >= step;
+            }
+
+            function formatProgressLabel(value) {
+                const number = Number(value);
+                if (!Number.isFinite(number)) return '';
+                if (!document.body.classList.contains('tv-display')) return `${value}%`;
+                const rounded = Math.round(number * 10) / 10;
+                return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}%`;
+            }
+
+            const progressDataLabelConfig = (color, align) => ({
+                color,
+                align,
+                anchor: 'center',
+                clamp: true,
+                clip: false,
+                display: shouldShowProgressLabel,
+                padding: 2,
+                font: {
+                    family: chartFontFamily,
+                    size: document.body.classList.contains('tv-display') ? 10 : 11,
+                    weight: 'bold'
+                },
+                formatter: formatProgressLabel
+            });
+
             function calculateTimeline() {
                 const inclusiveDays = Math.max(1, Math.floor((projectEndDate - projectStartDate) / 86400000) + 1);
                 const totalWeeks = Math.max(1, Math.ceil(inclusiveDays / 7));
@@ -549,7 +603,7 @@
                         pointRadius: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? 7 : 3,
                         pointBackgroundColor: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? '#ffffff' : '#5b9bd5',
                         pointBorderColor: '#5b9bd5', pointBorderWidth: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? 3 : 1,
-                        datalabels: { color: '#6bb8f7', align: 'top', font: { family: chartFontFamily, size: 11, weight: 'bold' }, formatter: v => (v ? v + '%' : '') }
+                        datalabels: progressDataLabelConfig('#6bb8f7', 'top')
                     },
                     {
                         label: '실적', data: [], borderColor: '#ed7d31', tension: 0.1,
@@ -557,7 +611,7 @@
                         pointRadius: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? 7 : 3,
                         pointBackgroundColor: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? '#ffffff' : '#ed7d31',
                         pointBorderColor: '#ed7d31', pointBorderWidth: ctx => ctx.dataIndex === (currentGlobalWeek - 1) ? 3 : 1,
-                        datalabels: { color: '#ff9147', align: 'bottom', font: { family: chartFontFamily, size: 11, weight: 'bold' }, formatter: v => (v ? v + '%' : '') }
+                        datalabels: progressDataLabelConfig('#ff9147', 'bottom')
                     }
                 ]},
                 options: {
