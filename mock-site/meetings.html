@@ -86,7 +86,7 @@
         <div class="layout-grid">
             <!-- 좌측: 회의 목록 -->
             <div class="panel">
-                <h2>회의 목록 (시간순 정렬)</h2>
+                <h2 id="meetingListTitle">회의 목록 · 전체</h2>
                 <table>
                     <thead>
                         <tr>
@@ -181,11 +181,12 @@
             return timeVal;
         }
 
-        async function fetchMeetings(url) {
+        async function fetchMeetings(url, scopeLabel) {
             try {
                 const res = await fetch(url);
                 const meetings = await res.json();
                 const tbody = document.getElementById('meetingTableBody');
+                document.getElementById('meetingListTitle').textContent = `회의 목록 · ${scopeLabel} (${meetings.length}건)`;
                 tbody.innerHTML = '';
 
                 if (meetings.length === 0) {
@@ -215,13 +216,18 @@
 
         function loadMeetings() {
             const dateVal = document.getElementById('searchDate').value;
-            let url = '/api/meetings';
-            if (dateVal) url += `?date=${dateVal}`;
-            fetchMeetings(url);
+            if (!dateVal) {
+                loadAllMeetings();
+                return;
+            }
+            document.getElementById('meetingListTitle').textContent = `회의 목록 · ${dateVal} (조회 중...)`;
+            fetchMeetings(`/api/meetings?date=${encodeURIComponent(dateVal)}`, dateVal);
         }
 
         function loadAllMeetings() {
-            fetchMeetings('/api/meetings');
+            document.getElementById('searchDate').value = '';
+            document.getElementById('meetingListTitle').textContent = '회의 목록 · 전체 (조회 중...)';
+            fetchMeetings('/api/meetings', '전체');
         }
 
         function renderFileArea() {
@@ -425,9 +431,9 @@
         }
 
         document.addEventListener("DOMContentLoaded", () => {
-            document.getElementById('searchDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('searchDate').value = '';
             resetForm();
-            loadMeetings();
+            loadAllMeetings();
         });
     </script>
 </body>
