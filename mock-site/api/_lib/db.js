@@ -37,7 +37,7 @@ async function initializeSchema() {
   } catch (error) {
     if (error?.code !== '42P01') throw error;
   }
-  if (Number(versionRows[0]?.value || 0) >= 2) return;
+  if (Number(versionRows[0]?.value || 0) >= 3) return;
   await sql`CREATE TABLE IF NOT EXISTS app_meta (key VARCHAR(100) PRIMARY KEY, value TEXT, updated_at TIMESTAMPTZ DEFAULT NOW())`;
   await sql`
     CREATE TABLE IF NOT EXISTS project_config (
@@ -89,6 +89,46 @@ async function initializeSchema() {
       id BIGSERIAL PRIMARY KEY, file_name VARCHAR(255), wbs_rows INTEGER, weekly_rows INTEGER,
       imported_by VARCHAR(50), imported_at TIMESTAMPTZ DEFAULT NOW()
     )`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS work_items (
+      id BIGSERIAL PRIMARY KEY,
+      work_type VARCHAR(20) NOT NULL CHECK (work_type IN ('implementation','test')),
+      row_no INTEGER NOT NULL,
+      unit_system VARCHAR(100) NOT NULL,
+      assignee VARCHAR(100) NOT NULL,
+      item_name VARCHAR(200) NOT NULL,
+      plan_start_date DATE,
+      plan_end_date DATE,
+      actual_start_date DATE,
+      actual_end_date DATE,
+      evidence_blob_url TEXT,
+      evidence_pathname TEXT,
+      evidence_file_name VARCHAR(255),
+      evidence_content_type VARCHAR(100),
+      evidence_file_size BIGINT DEFAULT 0,
+      evidence_uploaded_by VARCHAR(50),
+      qa_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (qa_status IN ('pending','approved','rejected')),
+      qa_rejection_reason TEXT,
+      qa_reviewed_by VARCHAR(50),
+      qa_reviewed_at TIMESTAMPTZ,
+      pl_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (pl_status IN ('pending','approved','rejected')),
+      pl_rejection_reason TEXT,
+      pl_reviewed_by VARCHAR(50),
+      pl_reviewed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(work_type, unit_system, item_name)
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS work_items_type_order_idx ON work_items(work_type,row_no,id)`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS work_imports (
+      id BIGSERIAL PRIMARY KEY,
+      work_type VARCHAR(20) NOT NULL,
+      file_name VARCHAR(255) NOT NULL,
+      row_count INTEGER NOT NULL,
+      imported_by VARCHAR(50),
+      imported_at TIMESTAMPTZ DEFAULT NOW()
+    )`;
 
   await sql`INSERT INTO project_config (id, project_title, target_date, start_date, end_date)
     VALUES (1, '석유통합관제센터 구축', '2026-11-01', '2026-08-01', '2026-12-31') ON CONFLICT (id) DO NOTHING`;
@@ -108,6 +148,8 @@ async function initializeSchema() {
       ('TEAM','팀명','DEV','개발팀',1),('TEAM','팀명','PMO','PMO팀',2),('TEAM','팀명','OPS','운영팀',3),
       ('TEAM','팀명','SUP','지원팀',4),('JOB','직무','DEV','개발담당',1),('JOB','직무','PM','사업관리',2) ON CONFLICT DO NOTHING`;
   }
+  await sql`INSERT INTO common_codes (category_code,category_code_name,code_value,code_name,sort_order) VALUES
+    ('JOB','직무','QA','QA',30),('JOB','직무','PL','PL',40) ON CONFLICT(category_code,code_value) DO NOTHING`;
 
   const wbsCount = await sql`SELECT COUNT(*)::int AS count FROM wbs_progress`;
   if (wbsCount[0].count === 0) {
@@ -127,7 +169,7 @@ async function initializeSchema() {
       }
     });
   }
-  await sql`INSERT INTO app_meta(key,value,updated_at) VALUES('schema_version','2',NOW()) ON CONFLICT(key) DO UPDATE SET value='2',updated_at=NOW()`;
+  await sql`INSERT INTO app_meta(key,value,updated_at) VALUES('schema_version','3',NOW()) ON CONFLICT(key) DO UPDATE SET value='3',updated_at=NOW()`;
 }
 
 export function dateString(value) {

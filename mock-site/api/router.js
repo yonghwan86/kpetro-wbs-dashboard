@@ -11,7 +11,9 @@ export const config = { api: { bodyParser: false } };
 
 const MAX_EXCEL_SIZE = 4 * 1024 * 1024;
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const MAX_EVIDENCE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(['pdf','doc','docx','hwp','hwpx','xls','xlsx','ppt','pptx','txt','png','jpg','jpeg']);
+const ALLOWED_EVIDENCE_EXTENSIONS = new Set(['png','jpg','jpeg','webp']);
 
 function json(res, status, body) { res.status(status).json(body); }
 function value(field) { return Array.isArray(field) ? String(field[0] ?? '') : String(field ?? ''); }
@@ -55,6 +57,35 @@ function requireUser(res, user, permission, admin = false, allowFirstLogin = fal
 
 function dateFields(row) {
   return { ...row, start_date: dateString(row.start_date), end_date: dateString(row.end_date) };
+}
+
+function workMeta(workType) {
+  if (workType === 'implementation') return { permission: 'implementation', label: '구현 관리', itemLabel: '프로그램명' };
+  if (workType === 'test') return { permission: 'test', label: '테스트 관리', itemLabel: 'TEST CASE명' };
+  return null;
+}
+
+function normalizedRole(user) { return clean(user?.job_role, 50).toUpperCase(); }
+function canReviewQa(user) { return Boolean(user?.is_admin) || normalizedRole(user) === 'QA'; }
+function canReviewPl(user) { return Boolean(user?.is_admin) || normalizedRole(user) === 'PL'; }
+function canEditWork(user, row) {
+  if (user?.is_admin) return true;
+  const assignee = clean(row?.assignee, 100).toLocaleLowerCase('ko-KR');
+  return Boolean(assignee) && [user?.id, user?.name].some(valueToCompare => clean(valueToCompare, 100).toLocaleLowerCase('ko-KR') === assignee);
+}
+
+function workItemJson(row, user) {
+  return {
+    id: Number(row.id), row_no: Number(row.row_no), unit_system: row.unit_system, assignee: row.assignee,
+    item_name: row.item_name, plan_start_date: dateString(row.plan_start_date), plan_end_date: dateString(row.plan_end_date),
+    actual_start_date: dateString(row.actual_start_date), actual_end_date: dateString(row.actual_end_date),
+    has_evidence: Boolean(row.evidence_blob_url), evidence_file_name: row.evidence_file_name || '',
+    evidence_file_size: Number(row.evidence_file_size || 0), qa_status: row.qa_status || 'pending',
+    qa_rejection_reason: row.qa_rejection_reason || '', qa_reviewed_by: row.qa_reviewed_by || '',
+    pl_status: row.pl_status || 'pending', pl_rejection_reason: row.pl_rejection_reason || '',
+    pl_reviewed_by: row.pl_reviewed_by || '', can_edit: canEditWork(user, row), can_qa: canReviewQa(user),
+    can_pl: canReviewPl(user) && row.qa_status === 'approved', can_delete: Boolean(user?.is_admin),
+  };
 }
 
 async function configHandler(req, res, user) {
@@ -249,6 +280,91 @@ async function weeklyHandler(req,res,user){
   return json(res,200,{status:'success',message:'성공적으로 저장되었습니다.'});
 }
 
+async function workListHandler(req,res,user,workType){
+  const meta=workMeta(workType);if(!meta)return json(res,404,{success:false,message:'업무 구분을 찾을 수 없습니다.'});
+  if(!requireUser(res,user,meta.permission))return;
+  const rows=await sql`SELECT * FROM work_items WHERE work_type=${workType} ORDER BY row_no,id`;
+  return json(res,200,{items:rows.map(row=>workItemJson(row,user)),actor:{
+    user_id:user.id,user_name:user.name,job_role:user.job_role||'',is_admin:Boolean(user.is_admin),
+    can_import:Boolean(user.is_admin),can_qa:canReviewQa(user),can_pl:canReviewPl(user),
+  }});
+}
+
+async function workTemplateHandler(req,res,user,workType){
+  const meta=workMeta(workType);if(!meta||!requireUser(res,user,meta.permission))return;
+  const rows=await sql`SELECT row_no,unit_system,assignee,item_name,plan_start_date,plan_end_date FROM work_items WHERE work_type=${workType} ORDER BY row_no,id`;
+  const {makeWorkTemplate}=await import('./_lib/excel.js');
+  const buffer=await makeWorkTemplate(workType,rows.map(row=>({...row,plan_start_date:dateString(row.plan_start_date),plan_end_date:dateString(row.plan_end_date)})));
+  const fileName=workType==='implementation'?'KPetro_implementation_plan.xlsx':'KPetro_test_plan.xlsx';
+  res.statusCode=200;res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition',`attachment; filename="${fileName}"`);return res.end(buffer);
+}
+
+async function workImportHandler(req,res,user,workType){
+  const meta=workMeta(workType);if(!meta)return json(res,404,{success:false,message:'업무 구분을 찾을 수 없습니다.'});
+  if(!requireUser(res,user,meta.permission,true))return;
+  const {fields,files}=await parseForm(req,{maxFileSize:MAX_EXCEL_SIZE});const file=fileList(files,'file')[0];
+  if(!file||!/\.xlsx$/i.test(file.originalFilename||''))return json(res,400,{success:false,message:'엑셀(.xlsx) 파일을 선택해주세요.'});
+  const {parseWorkWorkbook}=await import('./_lib/excel.js');let items;
+  try{items=await parseWorkWorkbook(file.filepath,workType);}catch(error){return json(res,400,{success:false,message:error?.message?.includes('행')||error?.message?.includes('데이터')?error.message:'엑셀 양식과 내용을 확인해주세요.'});}
+  const mode=value(fields.mode)||'preview';
+  if(mode!=='apply')return json(res,200,{success:true,preview:true,row_count:items.length,rows:items.slice(0,8)});
+  await sql.begin(async tx=>{
+    for(const item of items)await tx`INSERT INTO work_items(work_type,row_no,unit_system,assignee,item_name,plan_start_date,plan_end_date,updated_at)
+      VALUES(${workType},${item.row_no},${item.unit_system},${item.assignee},${item.item_name},${item.plan_start_date},${item.plan_end_date},NOW())
+      ON CONFLICT(work_type,unit_system,item_name)DO UPDATE SET row_no=EXCLUDED.row_no,assignee=EXCLUDED.assignee,
+      plan_start_date=EXCLUDED.plan_start_date,plan_end_date=EXCLUDED.plan_end_date,updated_at=NOW()`;
+    await tx`INSERT INTO work_imports(work_type,file_name,row_count,imported_by)VALUES(${workType},${clean(file.originalFilename,255)},${items.length},${user.id})`;
+  });
+  return json(res,200,{success:true,message:`${meta.label} 계획 ${items.length}행을 반영했습니다.`,row_count:items.length});
+}
+
+async function workItemHandler(req,res,user,workType,id){
+  const meta=workMeta(workType);if(!meta||!requireUser(res,user,meta.permission))return;
+  const row=(await sql`SELECT * FROM work_items WHERE id=${id} AND work_type=${workType}`)[0];
+  if(!row)return json(res,404,{success:false,message:'업무 항목을 찾을 수 없습니다.'});
+  if(req.method==='DELETE'){
+    if(!user.is_admin)return json(res,403,{success:false,message:'관리자만 계획 항목을 삭제할 수 있습니다.'});
+    if(row.evidence_blob_url){const {del}=await import('@vercel/blob');await del(row.evidence_blob_url);}
+    await sql`DELETE FROM work_items WHERE id=${id}`;return json(res,200,{success:true});
+  }
+  if(!canEditWork(user,row))return json(res,403,{success:false,message:'본인에게 배정된 항목만 증적을 등록할 수 있습니다.'});
+  const data=await readJson(req);const actualStart=clean(data.actual_start_date,10)||null,actualEnd=clean(data.actual_end_date,10)||null;
+  const isoDate=/^\d{4}-\d{2}-\d{2}$/;
+  if((actualStart&&!isoDate.test(actualStart))||(actualEnd&&!isoDate.test(actualEnd)))return json(res,400,{success:false,message:'실제 일정의 날짜 형식이 올바르지 않습니다.'});
+  if(actualStart&&actualEnd&&actualStart>actualEnd)return json(res,400,{success:false,message:'실제 종료일이 시작일보다 빠릅니다.'});
+  await sql`UPDATE work_items SET actual_start_date=${actualStart},actual_end_date=${actualEnd},qa_status='pending',qa_rejection_reason=NULL,
+    qa_reviewed_by=NULL,qa_reviewed_at=NULL,pl_status='pending',pl_rejection_reason=NULL,pl_reviewed_by=NULL,pl_reviewed_at=NULL,updated_at=NOW() WHERE id=${id}`;
+  return json(res,200,{success:true,message:'실제 일정이 저장되었으며 승인 상태가 초기화되었습니다.'});
+}
+
+async function workReviewHandler(req,res,user,workType,id,reviewType){
+  const meta=workMeta(workType);if(!meta||!requireUser(res,user,meta.permission))return;
+  const row=(await sql`SELECT * FROM work_items WHERE id=${id} AND work_type=${workType}`)[0];
+  if(!row)return json(res,404,{success:false,message:'업무 항목을 찾을 수 없습니다.'});
+  if(reviewType==='qa'&&!canReviewQa(user))return json(res,403,{success:false,message:'QA 또는 관리자만 QA 심사를 처리할 수 있습니다.'});
+  if(reviewType==='pl'&&!canReviewPl(user))return json(res,403,{success:false,message:'PL 또는 관리자만 최종 심사를 처리할 수 있습니다.'});
+  if(reviewType==='pl'&&row.qa_status!=='approved')return json(res,409,{success:false,message:'QA 승인 후 PL 심사를 진행할 수 있습니다.'});
+  const data=await readJson(req);const status=clean(data.status,20),reason=clean(data.rejection_reason,4000);
+  if(!['approved','rejected'].includes(status))return json(res,400,{success:false,message:'승인 또는 거절을 선택해주세요.'});
+  if(status==='rejected'&&!reason)return json(res,400,{success:false,message:'거절 사유를 입력해주세요.'});
+  if(reviewType==='qa')await sql`UPDATE work_items SET qa_status=${status},qa_rejection_reason=${status==='rejected'?reason:null},qa_reviewed_by=${user.id},qa_reviewed_at=NOW(),
+    pl_status='pending',pl_rejection_reason=NULL,pl_reviewed_by=NULL,pl_reviewed_at=NULL,updated_at=NOW() WHERE id=${id}`;
+  else await sql`UPDATE work_items SET pl_status=${status},pl_rejection_reason=${status==='rejected'?reason:null},pl_reviewed_by=${user.id},pl_reviewed_at=NOW(),updated_at=NOW() WHERE id=${id}`;
+  return json(res,200,{success:true});
+}
+
+async function workEvidenceHandler(req,res,user,workType,id){
+  const meta=workMeta(workType);if(!meta||!requireUser(res,user,meta.permission))return;
+  const row=(await sql`SELECT evidence_blob_url,evidence_file_name,evidence_content_type FROM work_items WHERE id=${id} AND work_type=${workType}`)[0];
+  if(!row?.evidence_blob_url)return json(res,404,{success:false,message:'등록된 증적 이미지가 없습니다.'});
+  const {get}=await import('@vercel/blob');const response=await get(row.evidence_blob_url,{access:'private'});
+  if(!response||response.statusCode!==200)return json(res,404,{success:false,message:'저장된 증적 이미지를 찾을 수 없습니다.'});
+  res.statusCode=200;res.setHeader('Content-Type',row.evidence_content_type||response.blob.contentType||'image/png');
+  res.setHeader('Content-Disposition',`inline; filename*=UTF-8''${encodeURIComponent(row.evidence_file_name||'evidence.png')}`);
+  res.setHeader('Content-Security-Policy',"default-src 'none'; sandbox");Readable.fromWeb(response.stream).pipe(res);
+}
+
 async function meetingsHandler(req,res,user){
   if(!requireUser(res,user,'meetings'))return;
   if(req.method==='GET'){
@@ -296,13 +412,38 @@ async function brandingHandler(res,type){
 
 async function blobUploadHandler(req,res,user){
   const body=await readJson(req);
-  if(body?.type==='blob.generate-client-token'&&!requireUser(res,user,'meetings'))return;
+  if(body?.type==='blob.generate-client-token'&&!requireUser(res,user))return;
   const { handleUpload }=await import('@vercel/blob/client');
   const result=await handleUpload({body,request:req,onBeforeGenerateToken:async(pathname,clientPayload)=>{
-    const payload=JSON.parse(clientPayload||'{}');const meetingId=Number(payload.meetingId);if(!meetingId)throw new Error('회의 ID가 필요합니다.');const exists=await sql`SELECT id FROM meetings WHERE id=${meetingId}`;if(!exists.length)throw new Error('회의를 찾을 수 없습니다.');
-    const extension=String(payload.fileName||pathname).split('.').pop().toLowerCase();if(!ALLOWED_EXTENSIONS.has(extension))throw new Error('허용되지 않는 첨부파일 형식입니다.');
-    return{maximumSizeInBytes:MAX_FILE_SIZE,addRandomSuffix:true,tokenPayload:JSON.stringify({meetingId,fileName:clean(payload.fileName,255)})};
-  },onUploadCompleted:async({blob,tokenPayload})=>{const payload=JSON.parse(tokenPayload||'{}');await ensureSchema();await sql`INSERT INTO meeting_files(meeting_id,file_name,blob_url,pathname,content_type,file_size)VALUES(${payload.meetingId},${payload.fileName},${blob.url},${blob.pathname||''},${blob.contentType||''},${blob.size||0})`;}});
+    const payload=JSON.parse(clientPayload||'{}');const extension=String(payload.fileName||pathname).split('.').pop().toLowerCase();
+    if(payload.kind==='work-evidence'){
+      const meta=workMeta(payload.workType),itemId=Number(payload.itemId);if(!meta||!itemId)throw new Error('증적 항목 정보가 올바르지 않습니다.');
+      if(!hasPermission(user,meta.permission))throw new Error('증적 등록 권한이 없습니다.');
+      const item=(await sql`SELECT id,assignee FROM work_items WHERE id=${itemId} AND work_type=${payload.workType}`)[0];
+      if(!item||!canEditWork(user,item))throw new Error('본인에게 배정된 항목만 증적을 등록할 수 있습니다.');
+      if(!ALLOWED_EVIDENCE_EXTENSIONS.has(extension))throw new Error('증적은 PNG, JPG, WEBP 이미지만 등록할 수 있습니다.');
+      return{maximumSizeInBytes:MAX_EVIDENCE_SIZE,allowedContentTypes:['image/png','image/jpeg','image/webp'],addRandomSuffix:true,
+        tokenPayload:JSON.stringify({kind:'work-evidence',workType:payload.workType,itemId,fileName:clean(payload.fileName,255),userId:user.id})};
+    }
+    if(!hasPermission(user,'meetings'))throw new Error('회의 첨부파일 등록 권한이 없습니다.');
+    const meetingId=Number(payload.meetingId);if(!meetingId)throw new Error('회의 ID가 필요합니다.');const exists=await sql`SELECT id FROM meetings WHERE id=${meetingId}`;if(!exists.length)throw new Error('회의를 찾을 수 없습니다.');
+    if(!ALLOWED_EXTENSIONS.has(extension))throw new Error('허용되지 않는 첨부파일 형식입니다.');
+    return{maximumSizeInBytes:MAX_FILE_SIZE,addRandomSuffix:true,tokenPayload:JSON.stringify({kind:'meeting',meetingId,fileName:clean(payload.fileName,255)})};
+  },onUploadCompleted:async({blob,tokenPayload})=>{
+    const payload=JSON.parse(tokenPayload||'{}');await ensureSchema();
+    if(payload.kind==='work-evidence'){
+      if(!/^image\/(png|jpeg|webp)$/.test(blob.contentType||'')){const{del}=await import('@vercel/blob');await del(blob.url);throw new Error('허용되지 않는 증적 이미지 형식입니다.');}
+      const previous=(await sql`SELECT evidence_blob_url FROM work_items WHERE id=${payload.itemId} AND work_type=${payload.workType}`)[0];
+      const updated=await sql`UPDATE work_items SET evidence_blob_url=${blob.url},evidence_pathname=${blob.pathname||''},evidence_file_name=${payload.fileName},
+        evidence_content_type=${blob.contentType||''},evidence_file_size=${blob.size||0},evidence_uploaded_by=${payload.userId},qa_status='pending',qa_rejection_reason=NULL,
+        qa_reviewed_by=NULL,qa_reviewed_at=NULL,pl_status='pending',pl_rejection_reason=NULL,pl_reviewed_by=NULL,pl_reviewed_at=NULL,updated_at=NOW()
+        WHERE id=${payload.itemId} AND work_type=${payload.workType} RETURNING id`;
+      if(!updated.length){const{del}=await import('@vercel/blob');await del(blob.url);throw new Error('증적 항목을 찾을 수 없습니다.');}
+      if(previous?.evidence_blob_url&&previous.evidence_blob_url!==blob.url){const{del}=await import('@vercel/blob');await del(previous.evidence_blob_url);}
+      return;
+    }
+    await sql`INSERT INTO meeting_files(meeting_id,file_name,blob_url,pathname,content_type,file_size)VALUES(${payload.meetingId},${payload.fileName},${blob.url},${blob.pathname||''},${blob.contentType||''},${blob.size||0})`;
+  }});
   return json(res,200,result);
 }
 
@@ -311,7 +452,7 @@ export default async function handler(req,res){
   if(req.method==='OPTIONS'){res.status(204).end();return;}if(!['GET','HEAD'].includes(req.method)&&!sameOrigin(req))return json(res,403,{success:false,message:'허용되지 않은 요청입니다.'});
   try{
     await ensureSchema();const route=routeOf(req);const user=await currentUser(req);
-    if(route==='session'&&req.method==='GET')return user?json(res,200,{authenticated:true,user_id:user.id,user_name:user.name,is_admin:Boolean(user.is_admin),is_first_login:Boolean(user.is_first_login),screen_permissions:parsePermissions(user.screen_permissions)}):json(res,200,{authenticated:false});
+    if(route==='session'&&req.method==='GET')return user?json(res,200,{authenticated:true,user_id:user.id,user_name:user.name,team_name:user.team_name||'',job_role:user.job_role||'',is_admin:Boolean(user.is_admin),is_first_login:Boolean(user.is_first_login),screen_permissions:parsePermissions(user.screen_permissions)}):json(res,200,{authenticated:false});
     if(route==='login'&&req.method==='POST'){const data=await readJson(req);const found=await getUserById(clean(data.id,50));if(found?.locked_until&&new Date(found.locked_until)>new Date())return json(res,429,{success:false,message:'로그인 시도가 잠시 제한되었습니다. 10분 후 다시 시도해주세요.'});if(!found||!verifyPassword(found.password,data.password)){if(found)await sql`UPDATE users SET failed_login_count=COALESCE(failed_login_count,0)+1,locked_until=CASE WHEN COALESCE(failed_login_count,0)+1>=5 THEN NOW()+INTERVAL '10 minutes' ELSE NULL END WHERE id=${found.id}`;return json(res,401,{success:false,message:'아이디 또는 비밀번호가 올바르지 않습니다.'});}await sql`UPDATE users SET failed_login_count=0,locked_until=NULL WHERE id=${found.id}`;setSessionCookie(res,found);return json(res,200,{success:true,is_first_login:Boolean(found.is_first_login),is_admin:Boolean(found.is_admin)});}
     if(route==='logout'&&req.method==='POST'){clearSessionCookie(res);return json(res,200,{success:true});}
     if(route==='first-password'&&req.method==='POST'){if(!requireUser(res,user,null,false,true))return;const data=await readJson(req);const newPassword=String(data.password||'');if(newPassword.length<10||!/[A-Za-z]/.test(newPassword)||!/\d/.test(newPassword)||!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(newPassword))return json(res,400,{success:false,message:'새 비밀번호는 영문·숫자·특수문자를 포함한 10자 이상이어야 합니다.'});await sql`UPDATE users SET password=${hashPassword(newPassword)},is_first_login=FALSE,updated_at=NOW() WHERE id=${user.id}`;return json(res,200,{success:true});}
@@ -328,6 +469,17 @@ export default async function handler(req,res){
     if(route==='wbs/import'&&req.method==='POST')return wbsImportHandler(req,res,user);
     if(route==='wbs/template'&&req.method==='GET'){if(!requireUser(res,user,'input'))return;const { makeWbsTemplate }=await import('./_lib/excel.js');const buffer=await makeWbsTemplate();res.statusCode=200;res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');res.setHeader('Content-Disposition',"attachment; filename*=UTF-8''KPetro_WBS_import_template.xlsx");return res.end(buffer);}
     if(route==='weekly')return weeklyHandler(req,res,user);
+    const workRouteType=route.startsWith('implementation')?'implementation':route.startsWith('test-mgmt')?'test':null;
+    const workRouteBase=workRouteType==='implementation'?'implementation':'test-mgmt';
+    if(workRouteType&&route===workRouteBase&&req.method==='GET')return workListHandler(req,res,user,workRouteType);
+    if(workRouteType&&route===`${workRouteBase}/template`&&req.method==='GET')return workTemplateHandler(req,res,user,workRouteType);
+    if(workRouteType&&route===`${workRouteBase}/import`&&req.method==='POST')return workImportHandler(req,res,user,workRouteType);
+    if(workRouteType){
+      match=route.match(new RegExp(`^${workRouteBase}/(\\d+)(?:/(qa|pl|evidence))?$`));
+      if(match&&match[2]==='evidence'&&req.method==='GET')return workEvidenceHandler(req,res,user,workRouteType,Number(match[1]));
+      if(match&&['qa','pl'].includes(match[2])&&req.method==='PUT')return workReviewHandler(req,res,user,workRouteType,Number(match[1]),match[2]);
+      if(match&&!match[2]&&['PUT','DELETE'].includes(req.method))return workItemHandler(req,res,user,workRouteType,Number(match[1]));
+    }
     if(route==='meetings')return meetingsHandler(req,res,user);
     match=route.match(/^meetings\/(\d+)$/);if(match&&['PUT','DELETE'].includes(req.method))return meetingItemHandler(req,res,user,Number(match[1]));
     match=route.match(/^meeting-files\/(\d+)(\/download)?$/);if(match)return fileHandler(req,res,user,Number(match[1]),Boolean(match[2]));

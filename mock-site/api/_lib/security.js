@@ -101,7 +101,10 @@ export function normalizePermissions(raw) {
   if (typeof raw === 'string') {
     try { parsed = JSON.parse(raw || '{}'); } catch { parsed = {}; }
   }
-  const allowed = new Set(['대시보드', '단계별진척', '주차별진척', '회의관리', '프로젝트관리', '회원관리', '코드관리']);
+  const allowed = new Set([
+    '대시보드', '단계별진척', '주차별진척', '회의관리', '구현관리', '테스트관리',
+    '프로젝트관리', '회원관리', '코드관리',
+  ]);
   const normalized = {};
   Object.entries(parsed || {}).forEach(([key, value]) => {
     if (allowed.has(key) && value === 'Y') normalized[key] = 'Y';
@@ -116,7 +119,8 @@ export function parsePermissions(raw) {
 
 const PERMISSIONS = {
   dashboard: '대시보드', input: '단계별진척', weekly: '주차별진척', meetings: '회의관리',
-  project: '프로젝트관리', users: '회원관리', codes: '코드관리',
+  implementation: '구현관리', test: '테스트관리', project: '프로젝트관리',
+  users: '회원관리', codes: '코드관리',
 };
 
 export function hasPermission(user, key) {

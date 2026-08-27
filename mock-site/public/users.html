@@ -45,7 +45,7 @@
     </div>
 </main>
 <script>
-    const permissionNames=['대시보드','단계별진척','주차별진척','회의관리','프로젝트관리','회원관리','코드관리'];
+    const permissionNames=['대시보드','단계별진척','주차별진척','회의관리','구현관리','테스트관리','프로젝트관리','회원관리','코드관리'];
     let editingId='';
     function makeCell(row,value,className){const cell=document.createElement('td');cell.textContent=value??'';if(className)cell.className=className;row.appendChild(cell);return cell;}
     function permissionText(raw){if(raw==='all')return '전체';try{return Object.entries(JSON.parse(raw||'{}')).filter(([,v])=>v==='Y').map(([k])=>k).join(', ');}catch{return raw||'';}}

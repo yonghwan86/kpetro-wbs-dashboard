@@ -14,6 +14,13 @@ const ALIASES = {
   week_no: ['week_no', 'week', '주차', '주'],
   plan_rate: ['plan_rate', '계획진척률', '계획진척율', '계획률', '계획'],
   actual_rate: ['actual_rate', '실제진척률', '실제진척율', '실적진척률', '실적진척율', '실제', '실적'],
+  row_no: ['row_no', 'no', '번호', '순번'],
+  unit_system: ['unit_system', '단위시스템', '시스템'],
+  assignee: ['assignee', 'developer', '개발자', '담당자'],
+  program_name: ['program_name', '프로그램명', '프로그램'],
+  test_case_name: ['test_case_name', 'testcase명', 'test case명', '테스트케이스명', '테스트케이스'],
+  plan_start_date: ['plan_start_date', '계획시작일', '계획 시작일'],
+  plan_end_date: ['plan_end_date', '계획종료일', '계획 종료일'],
 };
 
 function normalizeHeader(value) { return String(value ?? '').trim().toLowerCase().replace(/[\s()%％._-]/g, ''); }
@@ -128,6 +135,80 @@ export async function parseUserWorkbook(filePath) {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(filePath, { ignoreNodes: ['dataValidations'] });
   return worksheetRows(workbook.worksheets[0]);
+}
+
+export async function parseWorkWorkbook(filePath, workType) {
+  if (!['implementation', 'test'].includes(workType)) throw new Error('업무 구분이 올바르지 않습니다.');
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(filePath, { ignoreNodes: ['dataValidations'] });
+  const rawRows = worksheetRows(workbook.worksheets[0]);
+  if (!rawRows.length) throw new Error('엑셀 파일에 등록할 계획 데이터가 없습니다.');
+  if (rawRows.length > 2000) throw new Error('한 번에 최대 2,000행까지 반영할 수 있습니다.');
+
+  const items = rawRows.map((row, index) => {
+    const rowNumber = index + 2;
+    const rowNo = Number(findValue(row, 'row_no'));
+    const unitSystem = text(findValue(row, 'unit_system'));
+    const assignee = text(findValue(row, 'assignee'));
+    const itemName = text(findValue(row, workType === 'implementation' ? 'program_name' : 'test_case_name'));
+    if (!Number.isInteger(rowNo) || rowNo < 1) throw new Error(`${rowNumber}행의 NO는 1 이상의 정수여야 합니다.`);
+    if (!unitSystem || !assignee || !itemName) throw new Error(`${rowNumber}행의 단위시스템, 담당자, ${workType === 'implementation' ? '프로그램명' : 'TEST CASE명'}은 필수입니다.`);
+    const planStartDate = excelDate(findValue(row, 'plan_start_date'), '계획 시작일', rowNumber, true);
+    const planEndDate = excelDate(findValue(row, 'plan_end_date'), '계획 종료일', rowNumber, true);
+    if (planStartDate > planEndDate) throw new Error(`${rowNumber}행의 계획 종료일이 시작일보다 빠릅니다.`);
+    return {
+      row_no: rowNo,
+      unit_system: unitSystem.slice(0, 100),
+      assignee: assignee.slice(0, 100),
+      item_name: itemName.slice(0, 200),
+      plan_start_date: planStartDate,
+      plan_end_date: planEndDate,
+    };
+  });
+
+  const keys = new Set();
+  items.forEach((item, index) => {
+    const key = `${item.unit_system}\u0000${item.item_name}`;
+    if (keys.has(key)) throw new Error(`${index + 2}행의 단위시스템과 항목명이 중복되었습니다.`);
+    keys.add(key);
+  });
+  return items;
+}
+
+export async function makeWorkTemplate(workType, items = []) {
+  if (!['implementation', 'test'].includes(workType)) throw new Error('업무 구분이 올바르지 않습니다.');
+  const isImplementation = workType === 'implementation';
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet(isImplementation ? '구현관리계획' : '테스트관리계획');
+  const itemHeader = isImplementation ? '프로그램명' : 'TEST CASE명';
+  const assigneeHeader = isImplementation ? '개발자' : '담당자';
+  const headers = ['NO', '단위시스템', assigneeHeader, itemHeader, '계획 시작일', '계획 종료일'];
+  sheet.columns = headers.map((header, index) => ({ header, key: header, width: [10, 24, 18, 34, 18, 18][index] }));
+  items.forEach(item => sheet.addRow({
+    NO: item.row_no,
+    단위시스템: item.unit_system,
+    [assigneeHeader]: item.assignee,
+    [itemHeader]: item.item_name,
+    '계획 시작일': item.plan_start_date,
+    '계획 종료일': item.plan_end_date,
+  }));
+  sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2B4F73' } };
+  sheet.views = [{ state: 'frozen', ySplit: 1 }];
+  sheet.autoFilter = { from: 'A1', to: 'F1' };
+  const guide = workbook.addWorksheet('작성안내');
+  guide.columns = [{ width: 18 }, { width: 80 }];
+  guide.addRows([
+    ['항목', '작성 방법'],
+    ['NO', '화면 표시 순서를 1 이상의 정수로 입력합니다.'],
+    ['단위시스템', '동일한 단위시스템과 항목명 조합은 한 번만 입력합니다.'],
+    [assigneeHeader, '회원 관리에 등록된 사용자 성명 또는 아이디와 동일하게 입력합니다.'],
+    [itemHeader, '기존 항목과 단위시스템·항목명이 같으면 계획 정보가 갱신됩니다.'],
+    ['날짜', 'YYYY-MM-DD 형식으로 입력하며 시작일은 종료일보다 늦을 수 없습니다.'],
+  ]);
+  guide.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  guide.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2B4F73' } };
+  return Buffer.from(await workbook.xlsx.writeBuffer());
 }
 
 export async function makeWbsTemplate() {

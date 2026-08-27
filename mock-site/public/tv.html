@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="refresh" content="3600">
-    <meta name="kpetro-build" content="2026-08-27-tv-chart-labels-v1">
+    <meta name="kpetro-build" content="2026-08-27-workflow-v1">
     <title id="pageTitle">프로젝트 구축 현황</title>
     <meta name="robots" content="noindex,nofollow,noarchive">
     <link rel="icon" href="/favicon.ico" sizes="any">
@@ -267,6 +267,17 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a2 2 0 0 1 2 2v15H5V6a2 2 0 0 1 2-2Z"></path><path d="M9 3h6v3H9zM8 11h8M8 15h8"></path></svg>
             <span>회의 관리</span>
         </a>
+        <details class="nav-settings nav-work">
+            <summary class="nav-btn" title="구현·테스트 계획과 증적 승인 업무를 엽니다.">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"></path></svg>
+                <span>개발·테스트</span>
+            </summary>
+            <div class="nav-settings-panel" role="menu">
+                <div class="nav-settings-title">증적·승인 업무</div>
+                <a class="nav-settings-link" role="menuitem" href="/implementation.html"><strong>구현 관리</strong><small>프로그램 일정·단위테스트 증적·QA/PL 승인</small></a>
+                <a class="nav-settings-link" role="menuitem" href="/test-mgmt.html"><strong>테스트 관리</strong><small>TEST CASE 일정·통합테스트 증적·QA/PL 승인</small></a>
+            </div>
+        </details>
         <button type="button" class="nav-btn nav-btn--secondary" onclick="window.print()" title="현재 대시보드를 인쇄하거나 PDF로 저장합니다.">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-4a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v4a2 2 0 0 1-2 2h-2"></path><path d="M7 14h10v7H7z"></path></svg>
             <span>인쇄·PDF</span>
@@ -744,18 +755,22 @@
         });
 
         document.addEventListener('click', event => {
-            const menu = document.querySelector('.nav-settings');
-            if (menu?.open && !menu.contains(event.target)) menu.open = false;
+            document.querySelectorAll('.nav-settings[open]').forEach(menu => {
+                if (!menu.contains(event.target)) menu.open = false;
+            });
         });
         document.addEventListener('keydown', event => {
             if (event.key === 'Escape') {
-                const menu = document.querySelector('.nav-settings');
-                if (menu?.open) {
+                document.querySelectorAll('.nav-settings[open]').forEach(menu => {
                     menu.open = false;
                     menu.querySelector('summary')?.focus();
-                }
+                });
             }
         });
+        document.querySelectorAll('.nav-settings').forEach(menu => menu.addEventListener('toggle', () => {
+            if (!menu.open) return;
+            document.querySelectorAll('.nav-settings').forEach(other => { if (other !== menu) other.open = false; });
+        }));
     </script>
 </body>
 </html>
